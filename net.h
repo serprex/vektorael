@@ -18,10 +18,8 @@
 #define Wf(x,y) (W[y]^=(1<<(x)))
 uint8_t readch(void);
 void readx(void*,int);
-int readln(char*,int);
 void writech(uint8_t);
 void writex(const void*,int);
-void writeln(const void*);
 int any(void);
 void ship(void);
 void shipall(int*,uint8_t);

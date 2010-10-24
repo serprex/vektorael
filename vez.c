@@ -2,36 +2,43 @@
 int lis,con[8];
 uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts;
 uint16_t port,W[16];
-struct sockaddr_in servaddr;
+struct sockaddr_in addr;
 int main(int argc,char**argv){
 	if(argc<2){
 		puts("veziovaer port");
 		return 1;
 	}
-	memset(&servaddr,0,sizeof(servaddr));
-	servaddr.sin_family=AF_INET;
+	if(argc>2){
+		FILE*lv=fopen(argv[2],"rb");
+		if(lv){
+			fread(W,16,2,lv);
+			fclose(lv);
+		}else printf("Failed to load %s\n",argv[2]);
+	}
+	memset(&addr,0,sizeof(addr));
+	addr.sin_family=AF_INET;
 	port=strtol(argv[1],0,0);
 	if((lis=socket(AF_INET,SOCK_STREAM,0))<0){
-		fprintf(stderr,"vez socket\n",errno);
+		fprintf(stderr,"vez socket %d\n",errno);
 		return 1;
 	}
 	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,"\1",1);
-	servaddr.sin_addr.s_addr=htonl(INADDR_ANY);
-	servaddr.sin_port=htons(port);
-	if(bind(lis,(struct sockaddr*)&servaddr,sizeof(servaddr))<0){
-		fprintf(stderr,"vez bind\n",errno);
+	addr.sin_addr.s_addr=htonl(INADDR_ANY);
+	addr.sin_port=htons(port);
+	if(bind(lis,(struct sockaddr*)&addr,sizeof(addr))<0){
+		fprintf(stderr,"vez bind %d\n",errno);
 		return 1;
 	}
 	if(listen(lis,8)<0){
-		fprintf(stderr,"vez listen\n",errno);
+		fprintf(stderr,"vez listen %d\n",errno);
 		return 1;
 	}
 	for(;;){
-		while(pop(cbts)<8&&(S=lis,any())){
+		if(pop(cbts)<8&&(S=lis,any())){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
 			if((S=con[nid]=accept(lis,0,0))<0){
-				fprintf(stderr,"vez accept\n",errno);
+				fprintf(stderr,"vez accept %d\n",errno);
 				break;
 			}
 			writech(nid);
@@ -56,6 +63,8 @@ int main(int argc,char**argv){
 						close(S);
 						cbts&=~(1<<i);
 						writech(i<<5);
+						shipall(con,cbts);
+						goto nomore;
 					case(1)
 						writech(1|i<<5);
 						writech(cx[i]=readch());
@@ -76,7 +85,7 @@ int main(int argc,char**argv){
 					case(5)
 						writech(4|i<<5);
 					case(6)
-						writech(2);
+						writech(2|i<<5);
 						Wf(cx[i]>>4,cy[i]>>4);
 					case(7)
 						writech(3);
@@ -86,10 +95,9 @@ int main(int argc,char**argv){
 						writech(3);
 						writech(cx[i]);
 						writech(cy[i]);
-					default:continue;
 					}
 					shipall(con,cbts);
-				}
+				}nomore:;
 			}
 	}
 }

@@ -14,13 +14,7 @@ uint8_t readch(){
 	do r=read(S,&c,1); while(r!=1);
 	return c;
 }
-int readln(char*p,int mxln){
-	for(int n=0;n<mxln;n++)
-		if(!(*p++=readch()))return n;
-	return mxln;
-}
 void readx(void*p,int len){
-	uint8_t c;
 	do{
 		int r;
 		do r=read(S,p,len); while(r<=0);
@@ -28,7 +22,7 @@ void readx(void*p,int len){
 		len-=r;
 	}while(len);
 }
-uint8_t buff[4096];
+uint8_t buff[55];//Largest message is handshake 2+7*3+32
 unsigned blen;
 void shipall(int*c,uint8_t cbts){
 	for(int i=0;i<8;i++)
@@ -59,7 +53,4 @@ void writech(uint8_t c){
 void writex(const void*p,int len){
 	memcpy(buff+blen,p,len);
 	blen+=len;
-}
-void writeln(const void*p){
-	while(*(char*)p)writech(*(char*)p++);
 }
