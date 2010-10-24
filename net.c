@@ -19,7 +19,7 @@ int readln(char*p,int mxln){
 		if(!(*p++=readch()))return n;
 	return mxln;
 }
-void readx(char*p,int len){
+void readx(void*p,int len){
 	uint8_t c;
 	do{
 		int r;

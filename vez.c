@@ -1,7 +1,7 @@
 #include "net.h"
 int lis,con[8];
 uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts;
-uint16_t port;
+uint16_t port,W[16];
 struct sockaddr_in servaddr;
 int main(int argc,char**argv){
 	if(argc<2){
@@ -30,14 +30,17 @@ int main(int argc,char**argv){
 		while(pop(cbts)<8&&(S=lis,any())){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
-			cbts|=1<<nid;
-			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"vez accept\n",errno);
+			if((S=con[nid]=accept(lis,0,0))<0){
+				fprintf(stderr,"vez accept\n",errno);
+				break;
+			}
 			writech(nid);
-			writech(cbts);
+			writech(cbts|=1<<nid);
 			for(int i=0;i<8;i++)
 				if(cbts&1<<i&&i!=nid){
 					writex(rgb[i],3);
 				}
+			writex(W,32);
 			ship();
 			writech(nid<<5|7);
 			readx(rgb[nid],3);
@@ -48,44 +51,43 @@ int main(int argc,char**argv){
 			if(cbts&1<<i){
 				S=con[i];
 				while(any()){
-					uint8_t r=readch();
-					if(r&1){
-						writech(i<<5|1);
-						writech(cx[i]=r);
+					switch(readch()){
+					case(0)
+						close(S);
+						cbts&=~(1<<i);
+						writech(i<<5);
+					case(1)
+						writech(1|i<<5);
+						writech(cx[i]=readch());
 						writech(cy[i]=readch());
 						writech(x[i]=readch());
 						writech(y[i]=readch());
-					}else((r&3)==2){
-						switch(r){
-						case(6)
-							writech(6|i<<5);
-						case(10)
-							writech(3);
-							writech(readch());
-							writech(readch());
-							writech(3);
-							writech(readch());
-							writech(readch());
-						case(14)
-							writech(5|i<<5);
-						case(18)
-							writech(4|i<<5);
-						case(22)
-							writech(2);
-							writech(cx[i]>>4|cy[i]&240);
-						case(26)
-							writech(3);
-							writech(x[i]);
-							writech(y[i]);
-						case(30)
-							writech(3);
-							writech(cx[i]);
-							writech(cy[i]);
-						}
-					}else(!r){
-						close(S);
-						writech(i<<5);
-					}else continue;
+					case(2)
+						writech(6|i<<5);
+					case(3)
+						writech(3);
+						writech(readch());
+						writech(readch());
+						writech(3);
+						writech(readch());
+						writech(readch());
+					case(4)
+						writech(5|i<<5);
+					case(5)
+						writech(4|i<<5);
+					case(6)
+						writech(2);
+						Wf(cx[i]>>4,cy[i]>>4);
+					case(7)
+						writech(3);
+						writech(x[i]);
+						writech(y[i]);
+					case(8)
+						writech(3);
+						writech(cx[i]);
+						writech(cy[i]);
+					default:continue;
+					}
 					shipall(con,cbts);
 				}
 			}
