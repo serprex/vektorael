@@ -23,6 +23,5 @@ void writex(const void*,int);
 int any(void);
 void ship(void);
 void shipall(int*);
-extern uint8_t cbts;
+extern uint8_t cbts,blen;
 extern int S;
-extern uint8_t blen;

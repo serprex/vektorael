@@ -5,6 +5,7 @@ uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,id,w,chg[8];
 uint16_t port,W[16];
 uint32_t mine=-1;
 FILE*rnd;
+GLuint hud;
 struct sockaddr_in addr;
 uint8_t B[256][4],Bs,H[256][6],Hs,D[256][5],Ds;
 void glCirc(int x,int y,int r){
@@ -68,6 +69,43 @@ int main(int argc,char**argv){
 	glfwInit();
 	if(!glfwOpenWindow(256,274,0,0,0,0,0,0,GLFW_WINDOW))return 1;
 	glOrtho(0,256,274,0,1,-1);
+	glNewList(hud=glGenLists(1),GL_COMPILE);
+	glColor3ubv(rgb[id]);
+	glBegin(GL_LINE_STRIP);
+	glVertex2i(97,257);
+	glVertex2i(113,257);
+	glVertex2i(113,273);
+	glVertex2i(100,273);
+	glVertex2i(100,260);
+	glVertex2i(110,260);
+	glVertex2i(110,270);
+	glVertex2i(103,270);
+	glVertex2i(103,263);
+	glVertex2i(107,263);
+	glVertex2i(107,266);
+	glEnd();
+	glBegin(GL_LINES);
+	glVertex2i(0,256);
+	glVertex2i(256,256);
+	glVertex2i(1,257);
+	glVertex2i(15,271);
+	glVertex2i(40,258);
+	glVertex2i(40,265);
+	glVertex2i(81,257);
+	glVertex2i(95,271);
+	glVertex2i(95,257);
+	glVertex2i(81,271);
+	glEnd();
+	glBegin(GL_POINTS);
+	glCirc(23,265,6);
+	glCirc(23,265,4);
+	glCirc(39,265,5);
+	glCirc(55,265,7);
+	glCirc(118,263,4);
+	glCirc(122,267,4);
+	glVertex2i(55,265);
+	glEnd();
+	glEndList();
 	for(;;){
 		while(any()){
 			uint8_t r=readch();
@@ -99,7 +137,6 @@ int main(int argc,char**argv){
 				D[Ds][3]=D[Ds][2]-16;
 				D[Ds][4]=r>>5;
 				Ds++;
-			case(4)//VOID
 			case(5)//WALL
 				Wf(cx[r>>5]>>4,cy[r>>5]>>4);
 			case(6)//MEET
@@ -124,37 +161,12 @@ int main(int argc,char**argv){
 				cbts&=~(1<<(r>>5));
 			}
 		}
-		glColor3ubv(rgb[id]);
+		glCallList(hud);
 		glBegin(GL_LINE_STRIP);
 		glVertex2i(w<<4,256);
 		glVertex2i(w<<4,273);
 		glVertex2i(w+1<<4,273);
 		glVertex2i(w+1<<4,256);
-		glEnd();
-		glBegin(GL_LINE_STRIP);
-		glVertex2i(97,257);
-		glVertex2i(113,257);
-		glVertex2i(113,273);
-		glVertex2i(100,273);
-		glVertex2i(100,260);
-		glVertex2i(110,260);
-		glVertex2i(110,270);
-		glVertex2i(103,270);
-		glVertex2i(103,263);
-		glVertex2i(107,263);
-		glVertex2i(107,266);
-		glEnd();
-		glBegin(GL_LINES);
-		glVertex2i(0,256);
-		glVertex2i(256,256);
-		glVertex2i(1,257);
-		glVertex2i(15,271);
-		glVertex2i(40,258);
-		glVertex2i(40,265);
-		glVertex2i(81,257);
-		glVertex2i(95,271);
-		glVertex2i(95,257);
-		glVertex2i(81,271);
 		glEnd();
 		for(int i=0;i<16;i++)
 			for(int j=0;j<16;j++)
@@ -167,13 +179,6 @@ int main(int argc,char**argv){
 					glEnd();
 				}
 		glBegin(GL_POINTS);
-		glCirc(23,265,6);
-		glCirc(23,265,4);
-		glCirc(39,265,5);
-		glCirc(55,265,7);
-		glCirc(118,263,4);
-		glCirc(122,267,4);
-		glVertex2i(55,265);
 		for(int i=0;i<8;i++)
 			if(chg[i]){
 				chg[i]--;
@@ -297,7 +302,6 @@ int main(int argc,char**argv){
 				D[Ds][3]=D[Ds][2]-16;
 				D[Ds][4]=id;
 				Ds++;
-			case(4)
 			case(5)
 				chg[5]=15;
 				Wf(cx[id]>>4,cy[id]>>4);
