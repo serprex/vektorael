@@ -1,39 +1,32 @@
 #include <GL/glfw.h>
 #include <math.h>
 #include "net.h"
-uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts,id,w,dc[8],chg[8];
+uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,id,w,chg[8];
 uint16_t port,W[16];
 uint32_t mine=-1;
 FILE*rnd;
 struct sockaddr_in addr;
 uint8_t B[256][4],Bs,H[256][6],Hs,D[256][5],Ds;
-int glCirc(uint8_t x,uint8_t y,uint8_t r){
-	uint16_t r2=r*r,r12=r*M_SQRT1_2;
-	glBegin(GL_POINTS);
+void glCirc(int x,int y,int r){
+	int r2=r*r,r12=r*M_SQRT1_2;
 	for(uint8_t xc=0;xc<=r12;xc++){
 		if(xc*xc+r*r>=r2)r--;
-		glVertex2f(x+xc,y+r);
-		glVertex2f(x+xc,y-r);
-		glVertex2f(x-xc,y+r);
-		glVertex2f(x-xc,y-r);
-		glVertex2f(x+r,y+xc);
-		glVertex2f(x+r,y-xc);
-		glVertex2f(x-r,y+xc);
-		glVertex2f(x-r,y-xc);
+		glVertex2i(x+xc,y+r);
+		glVertex2i(x+xc,y-r);
+		glVertex2i(x-xc,y+r);
+		glVertex2i(x-xc,y-r);
+		glVertex2i(x+r,y+xc);
+		glVertex2i(x+r,y-xc);
+		glVertex2i(x-r,y+xc);
+		glVertex2i(x-r,y-xc);
 	}
-	glEnd();
-	return 0;
 }
-int die(){
-	dc[id]++;
+void die(){
 	for(int i=0;i<256;i++){
 		x[id]=fgetc(rnd);
 		y[id]=fgetc(rnd);
 		if(!W(x[id]>>4,y[id]>>4))return;
 	}
-}
-int quad(int x,int y){
-	return x+y<16?(x<y?2:0):x<y?1:3;
 }
 int main(int argc,char**argv){
 	rnd=fopen("/dev/urandom","r");
@@ -65,37 +58,21 @@ int main(int argc,char**argv){
 	writex(rgb2,3);
 	ship();
 	id=readch();
-	memcpy(rgb[id],rgb2,3);
 	cbts=readch();
 	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&i!=id){
-			readx(rgb[i],3);
-		}
+		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
 	readx(W,32);
+	die();
+	float fcx=cx[id]=-x[id],fcy=cy[id]=-y[id];
+	memcpy(rgb[id],rgb2,3);
 	glfwInit();
-	if(!glfwOpenWindow(320,320,0,0,0,0,0,0,GLFW_WINDOW))return 1;
-	glOrtho(0,320,320,0,1,-1);
+	if(!glfwOpenWindow(256,274,0,0,0,0,0,0,GLFW_WINDOW))return 1;
+	glOrtho(0,256,274,0,1,-1);
 	for(;;){
 		while(any()){
 			uint8_t r=readch();
-			switch(r&7){
-			case(0)//CBTS
-				cbts&=~(1<<(r>>5));
-			case(1)//MOVE
-				cx[r>>5]=readch();
-				cy[r>>5]=readch();
-				x[r>>5]=readch();
-				y[r>>5]=readch();
-			case(2)//WALL
-				Wf(cx[r>>5]>>4,cy[r>>5]>>4);
-			case(3)//BOMB
-				B[Bs][0]=readch();
-				B[Bs][1]=readch();
-				B[Bs][2]=0;
-				B[Bs][3]=r>>5;
-				Bs++;
-			case(4);
-			case(5)//SHOT
+			switch(r&15){
+			case(0)//SHOT
 				H[Hs][0]=x[r>>5];
 				H[Hs][1]=y[r>>5];
 				H[Hs][2]=cx[r>>5];
@@ -103,31 +80,82 @@ int main(int argc,char**argv){
 				H[Hs][4]=r>>5;
 				H[Hs][5]=0;
 				Hs++;
-			case(6)//DOME
+			case(1)//BOMB
+				B[Bs][0]=x[r>>5];
+				B[Bs][1]=y[r>>5];
+				B[Bs][2]=0;
+				B[Bs][3]=r>>5;
+				Bs++;
+			case(2)//NUKE
+				B[Bs][0]=cx[r>>5];
+				B[Bs][1]=cy[r>>5];
+				B[Bs][2]=0;
+				B[Bs][3]=r>>5;
+				Bs++;
+			case(3)//DOME
 				D[Ds][0]=x[r>>5];
 				D[Ds][1]=y[r>>5];
 				D[Ds][2]=hypot(x[r>>5]-cx[r>>5],y[r>>5]-cy[r>>5]);
 				D[Ds][3]=D[Ds][2]-16;
 				D[Ds][4]=r>>5;
 				Ds++;
-			case(7)//MEET
+			case(4)//VOID
+			case(5)//WALL
+				Wf(cx[r>>5]>>4,cy[r>>5]>>4);
+			case(6)//MEET
 				cbts|=1<<(r>>5);
 				readx(rgb[r>>5],3);
+			case(7)//MINE
+				B[Bs][0]=readch();
+				B[Bs][1]=readch();
+				B[Bs][2]=0;
+				B[Bs][3]=r>>5;
+				B[Bs+1][0]=readch();
+				B[Bs+1][1]=readch();
+				B[Bs+1][2]=0;
+				B[Bs+1][3]=r>>5;
+				Bs+=2;
+			case(8)//MOVE
+				cx[r>>5]=readch();
+				cy[r>>5]=readch();
+				x[r>>5]=readch();
+				y[r>>5]=readch();
+			case(9)//CBTS
+				cbts&=~(1<<(r>>5));
 			}
 		}
-		for(int i=0;i<8;i++)
-			if(cbts&1<<i){
-				glColor3ubv(rgb[i]);
-				glBegin(GL_POINTS);
-				glVertex2i(cx[i],cy[i]);
-				glEnd();
-				glCirc(x[i],y[i],4);
-			}
 		glColor3ubv(rgb[id]);
-		for(int i=0;i<8;i++){
-			if(chg[i])glRecti(256|i<<3,0,256|i+1<<3,chg[i]--);
-		}
-		glRecti(256|w<<3,256,256|w+1<<3,264);
+		glBegin(GL_LINE_STRIP);
+		glVertex2i(w<<4,256);
+		glVertex2i(w<<4,273);
+		glVertex2i(w+1<<4,273);
+		glVertex2i(w+1<<4,256);
+		glEnd();
+		glBegin(GL_LINE_STRIP);
+		glVertex2i(97,257);
+		glVertex2i(113,257);
+		glVertex2i(113,273);
+		glVertex2i(100,273);
+		glVertex2i(100,260);
+		glVertex2i(110,260);
+		glVertex2i(110,270);
+		glVertex2i(103,270);
+		glVertex2i(103,263);
+		glVertex2i(107,263);
+		glVertex2i(107,266);
+		glEnd();
+		glBegin(GL_LINES);
+		glVertex2i(0,256);
+		glVertex2i(256,256);
+		glVertex2i(1,257);
+		glVertex2i(15,271);
+		glVertex2i(40,258);
+		glVertex2i(40,265);
+		glVertex2i(81,257);
+		glVertex2i(95,271);
+		glVertex2i(95,257);
+		glVertex2i(81,271);
+		glEnd();
 		for(int i=0;i<16;i++)
 			for(int j=0;j<16;j++)
 				if(W(j,i)){
@@ -138,6 +166,25 @@ int main(int argc,char**argv){
 					glVertex2i(j<<4|1,i<<4|15);
 					glEnd();
 				}
+		glBegin(GL_POINTS);
+		glCirc(23,265,6);
+		glCirc(23,265,4);
+		glCirc(39,265,5);
+		glCirc(55,265,7);
+		glCirc(118,263,4);
+		glCirc(122,267,4);
+		glVertex2i(55,265);
+		for(int i=0;i<8;i++)
+			if(chg[i]){
+				chg[i]--;
+				for(int j=0;j<chg[i];j++)glVertex2i(i<<4|j&15,258+(j>>4));
+			}
+		for(int i=0;i<8;i++)
+			if(cbts&1<<i){
+				glColor3ubv(rgb[i]);
+				glVertex2i(cx[i],cy[i]);
+				glCirc(x[i],y[i],4);
+			}
 		for(int i=0;i<Bs;){
 			if(B[i][2]==80&&i<Bs){
 				memmove(B+i,B+i+1,(Bs-i)*4);
@@ -164,7 +211,6 @@ int main(int argc,char**argv){
 			}
 			i++;
 		}
-		glBegin(GL_POINTS);
 		for(int i=0;i<Hs;){
 			uint8_t
 				xx=H[i][0]+(H[i][2]-H[i][0])*H[i][5]*2/hypot(H[i][0]-H[i][2],H[i][1]-H[i][3]),
@@ -180,29 +226,26 @@ int main(int argc,char**argv){
 			i++;
 		}
 		glEnd();
-		glBegin(GL_LINE_STRIP);
-		glVertex2i(256,0);
-		glVertex2i(256,256);
-		glVertex2i(0,256);
-		glEnd();
-		glfwSleep(1./30-glfwGetTime());
-		glfwSetTime(0);
 		uint8_t kq=glfwGetKey('Q'),ke=glfwGetKey('E');
+		printf("%f\n",glfwGetTime());
 		glfwSwapBuffers();
 		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED)){
-			writech(0);
+			writech(9);
 			ship();
 			close(S);
 			return 0;
 		}
 		glClear(GL_COLOR_BUFFER_BIT);
-		cx[id]+=glfwGetKey('D')-glfwGetKey('A');
-		cy[id]+=glfwGetKey('S')-glfwGetKey('W');
-		x[id]+=glfwGetKey(GLFW_KEY_RIGHT)-glfwGetKey(GLFW_KEY_LEFT);
-		if(W(x[id]>>4,y[id]>>4))x[id]-=glfwGetKey(GLFW_KEY_RIGHT)-glfwGetKey(GLFW_KEY_LEFT);
-		y[id]+=glfwGetKey(GLFW_KEY_DOWN)-glfwGetKey(GLFW_KEY_UP);
-		if(W(x[id]>>4,y[id]>>4))y[id]-=glfwGetKey(GLFW_KEY_DOWN)-glfwGetKey(GLFW_KEY_UP);
-		w=(w+(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q')))&7;
+		int mx,my;
+		glfwGetMousePos(&mx,&my);
+		if(cx[id]!=mx)cx[id]=fcx=fmin(fmax(fcx+(mx-cx[id])/hypot(mx-cx[id],my-cy[id]),0),255);
+		if(cy[id]!=my)cy[id]=fcy=fmin(fmax(fcy+(my-cy[id])/hypot(mx-cx[id],my-cy[id]),0),255);
+		x[id]+=glfwGetKey('D')-glfwGetKey('A');
+		if(W(x[id]>>4,y[id]>>4))x[id]-=glfwGetKey('D')-glfwGetKey('A');
+		y[id]+=glfwGetKey('S')-glfwGetKey('W');
+		if(W(x[id]>>4,y[id]>>4))y[id]-=glfwGetKey('S')-glfwGetKey('W');
+		w=w+glfwGetMouseWheel()&7;
+		glfwSetMouseWheel(0);
 		if(glfwGetKey(GLFW_KEY_SPACE)){
 			FILE*lv=fopen("lv","wb");
 			if(lv){
@@ -210,22 +253,21 @@ int main(int argc,char**argv){
 				fclose(lv);
 			}else puts("Failed to open");
 		}
-		if(glfwGetKey('E')-glfwGetKey('Q'))fprintf(stderr,"%d",w);
-		if(w==6&&!chg[6]&&glfwGetKey('Z')){
+		if(w==6&&!chg[6]&&!W(cx[id]>>4,cy[id]>>4)&&glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT)){
+			chg[6]=255;
 			x[id]=cx[id];
 			y[id]=cy[id];
-			chg[6]=255;
 		}
-		writech(1);
+		writech(8);
 		writech(cx[id]);
 		writech(cy[id]);
 		writech(x[id]);
 		writech(y[id]);
-		if(w!=6&&!chg[w]&&glfwGetKey('Z')){
+		if(w!=6&&!chg[w]&&glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT)){
+			writech(w);
 			switch(w){
 			case(0)
 				chg[0]=30;
-				writech(4);
 				H[Hs][0]=x[id];
 				H[Hs][1]=y[id];
 				H[Hs][2]=cx[id];
@@ -235,7 +277,6 @@ int main(int argc,char**argv){
 				Hs++;
 			case(1)
 				chg[1]=120;
-				writech(7);
 				B[Bs][0]=x[id];
 				B[Bs][1]=y[id];
 				B[Bs][2]=0;
@@ -243,7 +284,6 @@ int main(int argc,char**argv){
 				Bs++;
 			case(2)
 				chg[2]=240;
-				writech(8);
 				B[Bs][0]=cx[id];
 				B[Bs][1]=cy[id];
 				B[Bs][2]=0;
@@ -251,25 +291,23 @@ int main(int argc,char**argv){
 				Bs++;
 			case(3)
 				chg[3]=150;
-				writech(2);
 				D[Ds][0]=x[id];
 				D[Ds][1]=y[id];
 				D[Ds][2]=hypot(x[id]-cx[id],y[id]-cy[id]);
 				D[Ds][3]=D[Ds][2]-16;
 				D[Ds][4]=id;
 				Ds++;
-			case(4);
+			case(4)
 			case(5)
 				chg[5]=15;
-				writech(6);
 				Wf(cx[id]>>4,cy[id]>>4);
 			case(7)
 				if(mine==-1){
 					chg[7]=15;
 					mine=cx[id]|cy[id]<<8|x[id]<<16|y[id]<<24;
+					blen=0;
 				}else{
 					chg[7]=240;
-					writech(3);
 					writech(mine);
 					writech(mine>>8);
 					writech(mine>>16);
@@ -288,5 +326,7 @@ int main(int argc,char**argv){
 			}
 		}
 		ship();
+		glfwSleep(1./30-glfwGetTime());
+		glfwSetTime(0);
 	}
 }

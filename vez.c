@@ -1,14 +1,13 @@
 #include "net.h"
 int lis,con[8];
-uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts;
+uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0;
 uint16_t port,W[16];
 struct sockaddr_in addr;
 int main(int argc,char**argv){
 	if(argc<2){
 		puts("veziovaer port");
 		return 1;
-	}
-	if(argc>2){
+	}else(argc>2){
 		FILE*lv=fopen(argv[2],"rb");
 		if(lv){
 			fread(W,16,2,lv);
@@ -44,59 +43,40 @@ int main(int argc,char**argv){
 			writech(nid);
 			writech(cbts|=1<<nid);
 			for(int i=0;i<8;i++)
-				if(cbts&1<<i&&i!=nid){
-					writex(rgb[i],3);
-				}
+				if(cbts&1<<i&&i!=nid)writex(rgb[i],3);
 			writex(W,32);
 			ship();
-			writech(nid<<5|7);
+			writech(nid<<5|6);
 			readx(rgb[nid],3);
 			writex(rgb[nid],3);
-			shipall(con,cbts);
+			shipall(con);
 		}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				S=con[i];
 				while(any()){
-					switch(readch()){
-					case(0)
+					uint8_t r=readch();
+					writech(r|i<<5);
+					switch(r){
+					case(9)
 						close(S);
 						cbts&=~(1<<i);
-						writech(i<<5);
-						shipall(con,cbts);
+						shipall(con);
 						goto nomore;
-					case(1)
-						writech(1|i<<5);
+					case(8)
 						writech(cx[i]=readch());
 						writech(cy[i]=readch());
 						writech(x[i]=readch());
 						writech(y[i]=readch());
-					case(2)
-						writech(6|i<<5);
-					case(3)
-						writech(3);
-						writech(readch());
-						writech(readch());
-						writech(3);
-						writech(readch());
-						writech(readch());
-					case(4)
-						writech(5|i<<5);
-					case(5)
-						writech(4|i<<5);
-					case(6)
-						writech(2|i<<5);
-						Wf(cx[i]>>4,cy[i]>>4);
 					case(7)
-						writech(3);
-						writech(x[i]);
-						writech(y[i]);
-					case(8)
-						writech(3);
-						writech(cx[i]);
-						writech(cy[i]);
+						writech(readch());
+						writech(readch());
+						writech(readch());
+						writech(readch());
+					case(6)
+						Wf(cx[i]>>4,cy[i]>>4);
 					}
-					shipall(con,cbts);
+					shipall(con);
 				}nomore:;
 			}
 	}

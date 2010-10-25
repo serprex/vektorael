@@ -22,12 +22,11 @@ void readx(void*p,int len){
 		len-=r;
 	}while(len);
 }
-uint8_t buff[55];//Largest message is handshake 2+7*3+32
-unsigned blen;
-void shipall(int*c,uint8_t cbts){
+uint8_t buff[55],blen=0;//2+7*3+32
+void shipall(int*c){
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&c[i]!=S){
-			int l=blen;
+			uint8_t l=blen;
 			void*p=buff;
 			while(l){
 				int nw;
