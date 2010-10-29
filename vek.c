@@ -1,9 +1,15 @@
+#ifdef GLX
+#include <GL/glx.h>
+#include <time.h>
+#else
 #include <GL/glfw.h>
+#endif
 #include <math.h>
 #include "net.h"
 uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,id,w,chg[8];
 uint16_t port,W[16];
 uint32_t mine=-1;
+int mx,my,mb,ka,kw,kd,ks;
 FILE*rnd;
 GLuint hud;
 struct sockaddr_in addr;
@@ -29,7 +35,13 @@ void die(){
 		if(!W(x[id]>>4,y[id]>>4))return;
 	}
 }
+void axit(){
+	writech(9);
+	ship();
+	close(S);
+}
 int main(int argc,char**argv){
+	atexit(axit);
 	rnd=fopen("/dev/urandom","r");
 	if(argc<2){
 		puts("vektorael ip:port");
@@ -66,8 +78,17 @@ int main(int argc,char**argv){
 	die();
 	float fcx=cx[id]=-x[id],fcy=cy[id]=-y[id];
 	memcpy(rgb[id],rgb2,3);
+	#ifdef GLX
+	Display*dpy=XOpenDisplay(0);
+	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,274,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
+	XMapWindow(dpy,win);
+	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
+	glXMakeCurrent(dpy,win,ctx);
+	#else
 	glfwInit();
 	if(!glfwOpenWindow(256,274,0,0,0,0,0,0,GLFW_WINDOW))return 1;
+	#endif
 	glOrtho(0,256,274,0,1,-1);
 	glNewList(hud=glGenLists(1),GL_COMPILE);
 	glColor3ubv(rgb[id]);
@@ -231,24 +252,56 @@ int main(int argc,char**argv){
 			i++;
 		}
 		glEnd();
-		uint8_t kq=glfwGetKey('Q'),ke=glfwGetKey('E');
+		#if GLX
+		XEvent ev;
+		while(XPending(dpy)){
+			XNextEvent(dpy,&ev);
+			switch(ev.type){
+			KeySym keysym;
+			char buff;
+			case(KeyPress)
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1)
+					switch(buff){
+					case('d')kd=1;
+					case('a')ka=1;
+					case('s')ks=1;
+					case('w')kw=1;
+					case(' ')
+						FILE*lv=fopen("lv","wb");
+						if(lv){
+							fwrite(W,16,2,lv);
+							fclose(lv);
+						}else puts("Failed to open");
+					case(27)return 0;
+					}
+			case(KeyRelease)
+				if(XLookupString((XKeyEvent*)&ev,&buff,1,&keysym,NULL)==1)
+					switch(buff){
+					case('d')kd=0;
+					case('a')ka=0;
+					case('s')ks=0;
+					case('w')kw=0;
+					}
+			case(ButtonPress)
+				if(ev.xbutton.button<4)mb=1;
+				else w=w+(ev.xbutton.button==4)-(ev.xbutton.button==5)&7;
+			case(ButtonRelease)mb=0;
+			case(MotionNotify)
+				mx=ev.xmotion.x;
+				my=ev.xmotion.y;
+			}
+		}
+		glXSwapBuffers(dpy,win);
+		#else
 		printf("%f\n",glfwGetTime());
 		glfwSwapBuffers();
-		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED)){
-			writech(9);
-			ship();
-			close(S);
-			return 0;
-		}
-		glClear(GL_COLOR_BUFFER_BIT);
-		int mx,my;
+		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED))return 0;
 		glfwGetMousePos(&mx,&my);
-		if(cx[id]!=mx)cx[id]=fcx=fmin(fmax(fcx+(mx-cx[id])/hypot(mx-cx[id],my-cy[id]),0),255);
-		if(cy[id]!=my)cy[id]=fcy=fmin(fmax(fcy+(my-cy[id])/hypot(mx-cx[id],my-cy[id]),0),255);
-		x[id]+=glfwGetKey('D')-glfwGetKey('A');
-		if(W(x[id]>>4,y[id]>>4))x[id]-=glfwGetKey('D')-glfwGetKey('A');
-		y[id]+=glfwGetKey('S')-glfwGetKey('W');
-		if(W(x[id]>>4,y[id]>>4))y[id]-=glfwGetKey('S')-glfwGetKey('W');
+		mb=glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT);
+		kd=glfwGetKey('D');
+		ka=glfwGetKey('A');
+		ks=glfwGetKey('S');
+		kw=glfwGetKey('W');
 		w=w+glfwGetMouseWheel()&7;
 		glfwSetMouseWheel(0);
 		if(glfwGetKey(GLFW_KEY_SPACE)){
@@ -258,7 +311,15 @@ int main(int argc,char**argv){
 				fclose(lv);
 			}else puts("Failed to open");
 		}
-		if(w==6&&!chg[6]&&!W(cx[id]>>4,cy[id]>>4)&&glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT)){
+		#endif
+		glClear(GL_COLOR_BUFFER_BIT);
+		if(cx[id]!=mx)cx[id]=fcx=fmin(fmax(fcx+(mx-cx[id])/hypot(mx-cx[id],my-cy[id]),0),255);
+		if(cy[id]!=my)cy[id]=fcy=fmin(fmax(fcy+(my-cy[id])/hypot(mx-cx[id],my-cy[id]),0),255);
+		x[id]+=kd-ka;
+		if(W(x[id]>>4,y[id]>>4))x[id]-=kd-ka;
+		y[id]+=ks-kw;
+		if(W(x[id]>>4,y[id]>>4))y[id]-=ks-kw;
+		if(w==6&&!chg[6]&&!W(cx[id]>>4,cy[id]>>4)&&mb){
 			chg[6]=255;
 			x[id]=cx[id];
 			y[id]=cy[id];
@@ -268,7 +329,7 @@ int main(int argc,char**argv){
 		writech(cy[id]);
 		writech(x[id]);
 		writech(y[id]);
-		if(w!=6&&!chg[w]&&glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT)){
+		if(w!=6&&!chg[w]&&mb){
 			writech(w);
 			switch(w){
 			case(0)
@@ -330,7 +391,11 @@ int main(int argc,char**argv){
 			}
 		}
 		ship();
+		#ifdef GLX
+		usleep(30000);
+		#else
 		glfwSleep(1./30-glfwGetTime());
 		glfwSetTime(0);
+		#endif
 	}
 }

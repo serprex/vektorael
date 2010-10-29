@@ -11,7 +11,7 @@
 #include <errno.h>
 #define pop(x) __builtin_popcount(x)
 #define ffs(x) __builtin_ffs(x)
-#define case(x) break;case x:
+#define case(x) break;case x:;
 #define else(x) else if(x)
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
