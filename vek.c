@@ -37,8 +37,8 @@ void die(){
 	}
 }
 void axit(){
-	writech(9);
-	ship();
+	char b=9;
+	while(write(S,&b,1)!=1);
 	close(S);
 }
 int main(int argc,char**argv){
@@ -69,8 +69,7 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	uint8_t rgb2[3]={64|fgetc(rnd),64|fgetc(rnd),64|fgetc(rnd)};
-	writex(rgb2,3);
-	ship();
+	ship(rgb2,3);
 	id=readch();
 	cbts=readch();
 	for(int i=0;i<8;i++)
@@ -93,6 +92,7 @@ int main(int argc,char**argv){
 	#endif
 	glOrtho(0,256,274,0,1,-1);
 	glNewList(hud=glGenLists(1),GL_COMPILE);
+	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3ubv(rgb[id]);
 	glBegin(GL_LINE_STRIP);
 	glVertex2i(97,257);
@@ -128,9 +128,10 @@ int main(int argc,char**argv){
 	glCirc(122,267,4);
 	glVertex2i(55,265);
 	glEnd();
+	glBegin(GL_LINE_STRIP);
 	glEndList();
 	for(;;){
-		while(any()){
+		while(any(S)){
 			uint8_t r=readch();
 			switch(r&15){
 			case(0)//SHOT
@@ -186,7 +187,6 @@ int main(int argc,char**argv){
 			}
 		}
 		glCallList(hud);
-		glBegin(GL_LINE_STRIP);
 		glVertex2i(w<<4,256);
 		glVertex2i(w<<4,273);
 		glVertex2i(w+1<<4,273);
@@ -256,7 +256,7 @@ int main(int argc,char**argv){
 		}
 		glEnd();
 		int k_=0;
-		#if GLX
+		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		XEvent ev;
 		while(XPending(dpy)){
@@ -309,7 +309,6 @@ int main(int argc,char**argv){
 				fclose(lv);
 			}
 		}
-		glClear(GL_COLOR_BUFFER_BIT);
 		if(cx[id]!=mx)cx[id]=fcx=fmin(fmax(fcx+(mx-cx[id])/hypot(mx-cx[id],my-cy[id]),0),255);
 		if(cy[id]!=my)cy[id]=fcy=fmin(fmax(fcy+(my-cy[id])/hypot(mx-cx[id],my-cy[id]),0),255);
 		x[id]+=kda;
@@ -388,7 +387,8 @@ int main(int argc,char**argv){
 				}
 			}
 		}
-		ship();
+		ship(buff,blen);
+		blen=0;
 		#ifdef GLX
 		gettimeofday(&tvy,0);
 		fprintf(stderr,"%d\n",tvy.tv_usec-tvx.tv_usec);

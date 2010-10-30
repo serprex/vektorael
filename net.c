@@ -3,9 +3,9 @@
 #include <sys/poll.h>
 int S=0;
 uint8_t blen=0;
-int any(){
+int any(int s){
 	int r;
-	struct pollfd pfd={.fd=S,.events=POLLIN};
+	struct pollfd pfd={.fd=s,.events=POLLIN};
 	do r=poll(&pfd,1,0); while(r==-1);
 	return r;
 }
@@ -23,8 +23,7 @@ void readx(void*p,int len){
 		len-=r;
 	}while(len);
 }
-void ship(){
-	void*p=buff;
+void ship(void*p,int blen){
 	while(blen){
 		int nw;
 		do nw=write(S,p,blen); while(nw<=0);

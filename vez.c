@@ -3,25 +3,13 @@ int lis,con[8];
 uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,buff[55],beif[8][256],beln[8];
 uint16_t port,W[16];
 struct sockaddr_in addr;
-void mvtosh(){
+void mvtosh(int j){
 	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&con[i]!=S){
+		if(cbts&1<<i&&i!=j){
 			memcpy(beif[i]+beln[i],buff,blen);
 			beln[i]+=blen;
 		}
 	blen=0;
-}
-void shipall(){
-	for(int i=0;i<8;i++)
-		if(cbts&1<<i){
-			void*p=beif[i];
-			while(beln[i]){
-				int nw;
-				do nw=write(con[i],p,beln[i]); while(nw<=0);
-				p+=nw;
-				beln[i]-=nw;
-			}
-		}
 }
 int main(int argc,char**argv){
 	if(argc<2){
@@ -53,7 +41,7 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	for(;;){
-		if(pop(cbts)<8&&(S=lis,any())){
+		if(pop(cbts)<8&&any(lis)){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"accept %d\n",errno);
@@ -63,17 +51,17 @@ int main(int argc,char**argv){
 				for(int i=0;i<8;i++)
 					if(cbts&1<<i&&i!=nid)writex(rgb[i],3);
 				writex(W,32);
-				ship();
+				ship(buff,blen);
+				blen=0;
 				writech(nid<<5|6);
 				readx(rgb[nid],3);
 				writex(rgb[nid],3);
-				mvtosh();
+				mvtosh(nid);
 			}
 		}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
-				S=con[i];
-				while(any()){
+				while(any(con[i])){
 					uint8_t r=readch();
 					writech(r&15|i<<5);
 					switch(r&15){
@@ -96,8 +84,17 @@ int main(int argc,char**argv){
 						goto nomore;
 					}
 				}
-				nomore:mvtosh();
+				nomore:mvtosh(i);
 			}
-		shipall();
+		for(int i=0;i<8;i++)
+			if(cbts&1<<i){
+				void*p=beif[i];
+				while(beln[i]){
+					int nw;
+					do nw=write(con[i],p,beln[i]); while(nw<=0);
+					p+=nw;
+					beln[i]-=nw;
+				}
+			}
 	}
 }
