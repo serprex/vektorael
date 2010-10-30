@@ -18,9 +18,7 @@
 #define Wf(x,y) (W[y]^=(1<<(x)))
 uint8_t readch(void);
 void readx(void*,int);
-void writech(uint8_t);
-void writex(const void*,int);
 int any(int);
 void ship(void*,int);
-extern uint8_t cbts,blen,buff[];
+extern uint8_t cbts;
 extern int S;

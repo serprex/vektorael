@@ -7,14 +7,12 @@ struct timeval tvx,tvy;
 #endif
 #include "net.h"
 #include "math.h"
-uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,id,w,chg[8],buff[9];
+uint8_t rgb[8][3],xy[8][4],cbts,id,w,chg[8],buff[10]={8},mine,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds;
 uint16_t port,W[16];
-uint32_t mine=-1;
 int mx,my,mb,kda,ksw;
 FILE*rnd;
 GLuint hud;
 struct sockaddr_in addr;
-uint8_t B[256][5],Bs,H[256][6],Hs,D[256][5],Ds;
 void glCirc(int x,int y,int r){
 	int r2=r*r,r12=r*M_SQRT1_2;
 	for(int xc=0;xc<=r12;xc++){
@@ -31,9 +29,8 @@ void glCirc(int x,int y,int r){
 }
 void die(){
 	for(int i=0;i<256;i++){
-		x[id]=fgetc(rnd);
-		y[id]=fgetc(rnd);
-		if(!W(x[id]>>4,y[id]>>4))return;
+		fread(xy+id,2,1,rnd);
+		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
 	}
 }
 void axit(){
@@ -48,7 +45,6 @@ int main(int argc,char**argv){
 		puts("vektorael ip:port");
 		return 1;
 	}
-	memset(&addr,0,sizeof(addr));
 	addr.sin_family=AF_INET;
 	char*szPort=strchr(argv[1],':');
 	if(szPort){
@@ -76,15 +72,14 @@ int main(int argc,char**argv){
 		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
 	readx(W,32);
 	die();
-	float fcx=cx[id]=-x[id],fcy=cy[id]=-y[id];
+	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	memcpy(rgb[id],rgb2,3);
 	#ifdef GLX
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,274,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
-	GLXContext ctx=glXCreateContext(dpy,vi,0,GL_TRUE);
-	glXMakeCurrent(dpy,win,ctx);
+	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
 	#else
 	glfwInit();
@@ -136,52 +131,41 @@ int main(int argc,char**argv){
 			switch(r&15){
 			case(0)//SHOT
 				H[Hs][0]=r>>5;
-				H[Hs][1]=x[r>>5];
-				H[Hs][2]=y[r>>5];
-				H[Hs][3]=cx[r>>5];
-				H[Hs][4]=cy[r>>5];
+				memcpy(H[Hs]+1,xy[r>>5],4);
 				H[Hs][5]=0;
 				Hs++;
 			case(1)//BOMB
 				B[Bs][0]=r>>5;
-				B[Bs][1]=x[r>>5];
-				B[Bs][2]=y[r>>5];
+				memcpy(B[Bs]+1,xy[r>>5],2);
 				B[Bs][3]=0;
 				B[Bs][4]=64;
 				Bs++;
 			case(2)//NUKE
 				B[Bs][0]=r>>5;
-				B[Bs][1]=cx[r>>5];
-				B[Bs][2]=cy[r>>5];
+				memcpy(B[Bs]+1,xy[r>>5]+2,2);
 				B[Bs][3]=0;
 				B[Bs][4]=48;
 				Bs++;
 			case(3)//DOME
 				D[Ds][0]=r>>5;
-				D[Ds][1]=x[r>>5];
-				D[Ds][2]=y[r>>5];
-				D[Ds][3]=hypot(x[r>>5]-cx[r>>5],y[r>>5]-cy[r>>5]);
+				memcpy(D[Ds]+1,xy[r>>5],2);
+				D[Ds][3]=hypot(xy[r>>5][0]-xy[r>>5][2],xy[r>>5][1]-xy[r>>5][3]);
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
 			case(5)//WALL
-				Wf(cx[r>>5]>>4,cy[r>>5]>>4);
+				Wf(xy[r>>5][2]>>4,xy[r>>5][3]>>4);
 			case(6)//MEET
 				cbts|=1<<(r>>5);
 				readx(rgb[r>>5],3);
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
-				B[Bs][1]=readch();
-				B[Bs][2]=readch();
-				B[Bs+1][1]=readch();
-				B[Bs+1][2]=readch();
+				readx(B[Bs]+1,2);
+				readx(B[Bs+1]+1,2);
 				B[Bs][3]=B[Bs+1][3]=0;
 				B[Bs][4]=B[Bs+1][4]=32;
 				Bs+=2;
 			case(8)//MOVE
-				cx[r>>5]=readch();
-				cy[r>>5]=readch();
-				x[r>>5]=readch();
-				y[r>>5]=readch();
+				readx(xy[r>>5],4);
 			case(9)//CBTS
 				cbts&=~(1<<(r>>5));
 			}
@@ -211,8 +195,8 @@ int main(int argc,char**argv){
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
-				glVertex2i(cx[i],cy[i]);
-				glCirc(x[i],y[i],4);
+				glVertex2i(xy[i][2],xy[i][3]);
+				glCirc(xy[i][0],xy[i][1],4);
 			}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]]);
@@ -223,7 +207,7 @@ int main(int argc,char**argv){
 				Bs--;
 				continue;
 			}
-			if(B[i][3]>8&&SQR(x[id]-B[i][1])+SQR(y[id]-B[i][2])<SQR(B[i][3]))die();
+			if(B[i][3]>8&&SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2])<SQR(B[i][3]))die();
 			B[i][3]++;
 			i++;
 		}
@@ -233,7 +217,7 @@ int main(int argc,char**argv){
 			glCirc(D[i][1],D[i][2],D[i][3]);
 			D[i][4]+=2;
 			if(D[i][4]==D[i][3]){
-				if(SQR(x[id]-D[i][1])+SQR(y[id]-D[i][2])<SQR(D[i][3])&&SQR(x[id]-D[i][1])+SQR(y[id]-D[i][2])>SQR(D[i][3]-16))die();
+				if(SQR(xy[id][0]-D[i][1])+SQR(xy[id][1]-D[i][2])<SQR(D[i][3])&&SQR(xy[id][0]-D[i][1])+SQR(xy[id][1]-D[i][2])>SQR(D[i][3]-16))die();
 				memmove(D+i,D+i+1,(Hs-i)*5);
 				Ds--;
 				continue;
@@ -251,7 +235,7 @@ int main(int argc,char**argv){
 				Hs--;
 				continue;
 			}
-			if(H[i][0]!=id&&SQR(x[id]-xx)+SQR(y[id]-yy)<64)die();
+			if(H[i][0]!=id&&SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
 			i++;
 		}
 		glEnd();
@@ -262,7 +246,6 @@ int main(int argc,char**argv){
 		while(XPending(dpy)){
 			XNextEvent(dpy,&ev);
 			switch(ev.type){
-			char buff;
 			case(KeyPress)
 				switch(XKeycodeToKeysym(dpy,ev.xkey.keycode,0)){
 				case(XK_d)kda++;
@@ -289,7 +272,6 @@ int main(int argc,char**argv){
 			}
 		}
 		#else
-		printf("%f\n",glfwGetTime()*1000000);
 		glfwSwapBuffers();
 		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED))return 0;
 		glfwGetMousePos(&mx,&my);
@@ -309,92 +291,76 @@ int main(int argc,char**argv){
 				fclose(lv);
 			}
 		}
-		if(cx[id]!=mx)cx[id]=fcx=fmin(fmax(fcx+(mx-cx[id])/hypot(mx-cx[id],my-cy[id]),0),255);
-		if(cy[id]!=my)cy[id]=fcy=fmin(fmax(fcy+(my-cy[id])/hypot(mx-cx[id],my-cy[id]),0),255);
-		x[id]+=kda;
-		if(W(x[id]>>4,y[id]>>4))x[id]-=kda;
-		y[id]+=ksw;
-		if(W(x[id]>>4,y[id]>>4))y[id]-=ksw;
-		if(w==6&&!chg[6]&&!W(cx[id]>>4,cy[id]>>4)&&mb){
+		if(xy[id][2]!=mx)xy[id][2]=fcx=fmin(fmax(fcx+(mx-xy[id][2])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
+		if(xy[id][3]!=my)xy[id][3]=fcy=fmin(fmax(fcy+(my-xy[id][3])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
+		xy[id][0]+=kda;
+		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]-=kda;
+		xy[id][1]+=ksw;
+		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]-=ksw;
+		if(w==6&&!chg[6]&&!W(xy[id][2]>>4,xy[id][3]>>4)&&mb){
 			chg[6]=255;
-			x[id]=cx[id];
-			y[id]=cy[id];
+			xy[id][0]=xy[id][2];
+			xy[id][1]=xy[id][3];
 		}
-		writech(8);
-		writech(cx[id]);
-		writech(cy[id]);
-		writech(x[id]);
-		writech(y[id]);
+		memcpy(buff+1,xy+id,4);
+		uint8_t l=5;
 		if(w!=6&&!chg[w]&&mb){
-			writech(w);
-			switch(w){
+			switch(buff[l++]=w){
 			case(0)
 				chg[0]=30;
 				H[Hs][0]=id;
-				H[Hs][1]=x[id];
-				H[Hs][2]=y[id];
-				H[Hs][3]=cx[id];
-				H[Hs][4]=cy[id];
+				memcpy(H[Hs]+1,xy[id],4);
 				H[Hs][5]=0;
 				Hs++;
 			case(1)
 				chg[1]=120;
 				B[Bs][0]=id;
-				B[Bs][1]=x[id];
-				B[Bs][2]=y[id];
+				memcpy(B[Bs]+1,xy[id],2);
 				B[Bs][3]=0;
 				B[Bs][4]=64;
 				Bs++;
 			case(2)
 				chg[2]=180;
 				B[Bs][0]=id;
-				B[Bs][1]=cx[id];
-				B[Bs][2]=cy[id];
+				memcpy(B[Bs]+1,xy[id]+2,2);
 				B[Bs][3]=0;
 				B[Bs][4]=48;
 				Bs++;
 			case(3)
 				chg[3]=150;
 				D[Ds][0]=id;
-				D[Ds][1]=x[id];
-				D[Ds][2]=y[id];
-				D[Ds][3]=hypot(x[id]-cx[id],y[id]-cy[id]);
+				memcpy(D[Ds]+1,xy[id],2);
+				D[Ds][3]=hypot(xy[id][0]-xy[id][2],xy[id][1]-xy[id][3]);
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
 			case(5)
 				chg[5]=15;
-				Wf(cx[id]>>4,cy[id]>>4);
+				Wf(xy[id][2]>>4,xy[id][3]>>4);
 			case(7)
-				if(mine==-1){
+				if(mine=!mine){
 					chg[7]=15;
-					mine=cx[id]|cy[id]<<8|x[id]<<16|y[id]<<24;
-					blen=0;
+					l=5;
+					memcpy(buff+6,xy[id],4);
 				}else{
 					chg[7]=240;
-					writech(mine);
-					writech(mine>>8);
-					writech(mine>>16);
-					writech(mine>>24);
+					l=10;
 					B[Bs][0]=B[Bs+1][0]=id;
-					B[Bs][1]=mine;
-					B[Bs][2]=mine>>8;
-					B[Bs+1][1]=mine>>16;
-					B[Bs+1][2]=mine>>24;
+					memcpy(B[Bs]+1,buff+6,2);
+					memcpy(B[Bs+1]+1,buff+8,2);
 					B[Bs][3]=B[Bs+1][3]=0;
 					B[Bs][4]=B[Bs+1][4]=32;
 					Bs+=2;
-					mine=-1;
 				}
 			}
 		}
-		ship(buff,blen);
-		blen=0;
+		ship(buff,l);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
 		fprintf(stderr,"%d\n",tvy.tv_usec-tvx.tv_usec);
 		if(tvy.tv_usec>tvx.tv_usec)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
 		#else
+		printf("%f\n",glfwGetTime()*1000000);
 		glfwSleep(1./30-glfwGetTime());
 		glfwSetTime(0);
 		#endif

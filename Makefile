@@ -1,5 +1,5 @@
 all:vek vez
-CC=gcc -std=gnu99 -Os -march=native -s -ffast-math
+CC=gcc -std=gnu99 -O3 -march=native -s -ffast-math
 ifeq ($(NOLTO),)
 CFLAGS=-flto
 endif

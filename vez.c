@@ -1,15 +1,19 @@
 #include "net.h"
 int lis,con[8];
-uint8_t rgb[8][3],x[8],y[8],cx[8],cy[8],cbts=0,buff[55],beif[8][256],beln[8];
+uint8_t rgb[8][3],xy[8][4],cbts=0,beif[8][256],beln[8];
 uint16_t port,W[16];
 struct sockaddr_in addr;
-void mvtosh(int j){
+void writex(int j,const void*p,int len){
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&i!=j){
-			memcpy(beif[i]+beln[i],buff,blen);
-			beln[i]+=blen;
+			memcpy(beif[i]+beln[i],p,len);
+			beln[i]+=len;
 		}
-	blen=0;
+}
+void writech(int j,uint8_t c){
+	for(int i=0;i<8;i++)
+		if(cbts&1<<i&&i!=j)
+			beif[i][beln[i]++]=c;
 }
 int main(int argc,char**argv){
 	if(argc<2){
@@ -22,7 +26,6 @@ int main(int argc,char**argv){
 			fclose(lv);
 		}else fprintf(stderr,"fopen %s %d\n",argv[2],errno);
 	}
-	memset(&addr,0,sizeof(addr));
 	addr.sin_family=AF_INET;
 	port=strtol(argv[1],0,0);
 	if((lis=socket(AF_INET,SOCK_STREAM,0))<0){
@@ -46,45 +49,37 @@ int main(int argc,char**argv){
 			while(cbts&1<<nid)nid++;
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"accept %d\n",errno);
 			else{
-				writech(nid);
-				writech(cbts|=1<<nid);
+				uint8_t buff[55]={nid,cbts|=1<<nid},len=2;
 				for(int i=0;i<8;i++)
-					if(cbts&1<<i&&i!=nid)writex(rgb[i],3);
-				writex(W,32);
-				ship(buff,blen);
-				blen=0;
-				writech(nid<<5|6);
+					if(cbts&1<<i&&i!=nid){
+						memcpy(buff+len,rgb+i,3);
+						len+=3;
+					}
+				memcpy(buff+len,W,32);
+				ship(buff,len+32);
+				writech(nid,nid<<5|6);
 				readx(rgb[nid],3);
-				writex(rgb[nid],3);
-				mvtosh(nid);
+				writex(nid,rgb[nid],3);
 			}
 		}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
-				while(any(con[i])){
+				while(any(S=con[i])){
 					uint8_t r=readch();
-					writech(r&15|i<<5);
+					writech(i,r&15|i<<5);
 					switch(r&15){
 					case(6)
-						Wf(cx[i]>>4,cy[i]>>4);
-					case(7)
-						writech(readch());
-						writech(readch());
-						writech(readch());
-						writech(readch());
-					case(8)
-						writech(cx[i]=readch());
-						writech(cy[i]=readch());
-						writech(x[i]=readch());
-						writech(y[i]=readch());
+						Wf(xy[i][2]>>4,xy[i][3]>>4);
+					case(7)case 8:
+						readx(xy[i],4);
+						writex(i,xy[i],4);
 					case(9)
 						close(S);
 						beln[i]=0;
 						cbts&=~(1<<i);
 						goto nomore;
 					}
-				}
-				nomore:mvtosh(i);
+				}nomore:;
 			}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
