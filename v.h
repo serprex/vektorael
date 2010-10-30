@@ -29,9 +29,10 @@ uint8_t readch(){
 }
 void readx(void*p,int len){
 	do{
-		while((A=read(S,p,len))==-1);
-		p+=A;
-		len-=A;
+		int r;
+		while((r=read(S,p,len))==-1);
+		p+=r;
+		len-=r;
 	}while(len);
 }
 void ship(void*p,int blen){

@@ -46,7 +46,9 @@ int main(int argc,char**argv){
 			while(cbts&1<<nid)nid++;
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"a%d\n",errno);
 			else{
-				uint8_t buff[55]={nid,cbts|=1<<nid},len=2;
+				uint8_t buff[55],len=2;
+				buff[0]=nid;
+				buff[1]=cbts|=1<<nid;
 				for(int i=0;i<8;i++)
 					if(cbts&1<<i&&i!=nid){
 						memcpy(buff+len,rgb+i,3);
@@ -64,10 +66,10 @@ int main(int argc,char**argv){
 				while(any(S=con[i])){
 					uint8_t r=readch(),xy[4];
 					if(!A){
-						close(S);
 						beln[i]=0;
 						cbts&=~(1<<i);
-						writech(i,r&15|9);
+						writech(i,i<<5|9);
+						close(S);
 						goto nomore;
 					}
 					writech(i,r&15|i<<5);
