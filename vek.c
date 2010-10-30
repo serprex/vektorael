@@ -7,8 +7,8 @@ struct timeval tvx,tvy;
 #endif
 #include "v.h"
 #include "math.h"
-uint8_t rgb[8][3],xy[8][4],cbts,id,w,chg[8],buff[10]={8},mine,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds;
-uint16_t port,W[16];
+uint8_t rgb[8][3],xy[8][4],cbts,id,w,chg[8],buff[10]={8},mine,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint16_t W[16];
 int mx,my,mb,kda,ksw;
 FILE*rnd;
 GLuint hud;
@@ -33,14 +33,51 @@ void die(){
 		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
 	}
 }
-void axit(){
-	char b=9;
-	while(write(S,&b,1)!=1);
-	close(S);
+void axit(){close(S);}
+void mkwud(){
+	int wi[8];
+	for(int i=0;i<8;i++)wi[ws[i]]=i<<4;
+	glNewList(hud+1,GL_COMPILE);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glColor3ubv(rgb[id]);
+	glBegin(GL_LINE_STRIP);
+	glVertex2i(wi[0]|1,258);
+	glVertex2i(wi[0]|15,258);
+	glVertex2i(wi[0]|15,272);
+	glVertex2i(wi[0]|3,272);
+	glVertex2i(wi[0]|3,260);
+	glVertex2i(wi[0]|13,260);
+	glVertex2i(wi[0]|13,270);
+	glVertex2i(wi[0]|5,270);
+	glVertex2i(wi[0]|5,263);
+	glVertex2i(wi[0]|11,263);
+	glVertex2i(wi[0]|11,266);
+	glEnd();
+	glBegin(GL_POINTS);
+	glCirc(wi[1]|7,265,6);
+	glCirc(wi[1]|7,265,4);
+	glCirc(wi[2]|7,265,5);
+	glCirc(wi[3]|7,265,7);
+	glCirc(wi[7]|6,263,4);
+	glCirc(wi[7]|10,267,4);
+	glVertex2i(wi[3]|7,265);
+	glEnd();
+	glBegin(GL_LINES);
+	glVertex2i(0,256);
+	glVertex2i(256,256);
+	glVertex2i(wi[2]|8,258);
+	glVertex2i(wi[2]|8,265);
+	glVertex2i(wi[5]|1,257);
+	glVertex2i(wi[5]|15,271);
+	glVertex2i(wi[6]|1,257);
+	glVertex2i(wi[6]|15,271);
+	glVertex2i(wi[6]|15,257);
+	glVertex2i(wi[6]|1,271);
+	glEnd();
+	glEndList();
 }
 void mkhud(){
 	glNewList(hud,GL_COMPILE);
-	glCallList(hud+1);
 	for(int i=0;i<16;i++)
 		for(int j=0;j<16;j++)
 			if(W(j,i)){
@@ -54,41 +91,30 @@ void mkhud(){
 	glEndList();
 }
 int main(int argc,char**argv){
-	atexit(axit);
 	rnd=fopen("/dev/urandom","r");
 	if(argc<2){
-		puts("vektorael ip[:port]");
-		return 1;
+		puts("ip [port]");
+		return 0;
 	}
 	addr.sin_family=AF_INET;
-	char*szPort=strchr(argv[1],':');
-	if(szPort){
-		*szPort++=0;
-		port=strtol(szPort,0,0);
-	}else port=2000;
-	if((S=socket(AF_INET,SOCK_STREAM,0))<0){
-		fprintf(stderr,"s %d\n",errno);
+	addr.sin_port=htons(argc>2?strtol(argv[2],0,0):2000);
+	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&addr.sin_addr)<=0||connect(S,(struct sockaddr*)&addr,sizeof(addr))<0){
+		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
-	addr.sin_port=htons(port);
-	if(inet_aton(argv[1],&addr.sin_addr)<=0){
-		fprintf(stderr,"i %d\n",errno);
-		return 1;
-	}
-	if(connect(S,(struct sockaddr*)&addr,sizeof(addr))<0){
-		fprintf(stderr,"c %d\n",errno);
-		return 1;
-	}
-	uint8_t rgb2[3]={64|fgetc(rnd),64|fgetc(rnd),64|fgetc(rnd)};
-	ship(rgb2,3);
+	atexit(axit);
+	FILE*pr=fopen("rb","rb");
+	fread(rgb[0],3,1,pr?:rnd);
+	if(pr)fread(ws,8,1,pr);
+	ship(rgb[0],3);
 	id=readch();
+	memcpy(rgb[id],rgb[0],3);
 	cbts=readch();
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
 	readx(W,32);
 	die();
 	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
-	memcpy(rgb[id],rgb2,3);
 	#ifdef GLX
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
@@ -102,54 +128,16 @@ int main(int argc,char**argv){
 	#endif
 	glOrtho(0,256,273,0,1,-1);
 	hud=glGenLists(2);
-	glNewList(hud+1,GL_COMPILE);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glColor3ubv(rgb[id]);
-	glBegin(GL_LINE_STRIP);
-	glVertex2i(97,257);
-	glVertex2i(113,257);
-	glVertex2i(113,273);
-	glVertex2i(100,273);
-	glVertex2i(100,260);
-	glVertex2i(110,260);
-	glVertex2i(110,270);
-	glVertex2i(103,270);
-	glVertex2i(103,263);
-	glVertex2i(107,263);
-	glVertex2i(107,266);
-	glEnd();
-	glBegin(GL_POINTS);
-	glCirc(23,265,6);
-	glCirc(23,265,4);
-	glCirc(39,265,5);
-	glCirc(55,265,7);
-	glCirc(118,263,4);
-	glCirc(122,267,4);
-	glVertex2i(55,265);
-	glEnd();
-	glBegin(GL_LINES);
-	glVertex2i(0,256);
-	glVertex2i(256,256);
-	glVertex2i(1,257);
-	glVertex2i(15,271);
-	glVertex2i(40,258);
-	glVertex2i(40,265);
-	glVertex2i(81,257);
-	glVertex2i(95,271);
-	glVertex2i(95,257);
-	glVertex2i(81,271);
-	glEnd();
-	glEndList();
+	mkwud();
 	mkhud();
 	for(;;){
 		while(any(S)){
 			uint8_t r=readch();
+			if(!A)return 0;
 			switch(r&15){
-			case(0)//SHOT
-				H[Hs][0]=r>>5;
-				memcpy(H[Hs]+1,xy[r>>5],4);
-				H[Hs][5]=0;
-				Hs++;
+			case(0)//MEET
+				cbts|=1<<(r>>5);
+				readx(rgb[r>>5],3);
 			case(1)//BOMB
 				B[Bs][0]=r>>5;
 				memcpy(B[Bs]+1,xy[r>>5],2);
@@ -168,12 +156,14 @@ int main(int argc,char**argv){
 				D[Ds][3]=hypot(xy[r>>5][0]-xy[r>>5][2],xy[r>>5][1]-xy[r>>5][3]);
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
-			case(5)//WALL
+			case(5)//SHOT
+				H[Hs][0]=r>>5;
+				memcpy(H[Hs]+1,xy[r>>5],4);
+				H[Hs][5]=0;
+				Hs++;
+			case(6)//WALL
 				Wf(xy[r>>5][2]>>4,xy[r>>5][3]>>4);
 				mkhud();
-			case(6)//MEET
-				cbts|=1<<(r>>5);
-				readx(rgb[r>>5],3);
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
 				readx(B[Bs]+1,2);
@@ -187,6 +177,7 @@ int main(int argc,char**argv){
 				cbts&=~(1<<(r>>5));
 			}
 		}
+		glCallList(hud+1);
 		glCallList(hud);
 		glBegin(GL_LINES);
 		glVertex2i(w<<4,256);
@@ -194,14 +185,14 @@ int main(int argc,char**argv){
 		glVertex2i(w+1<<4,273);
 		glVertex2i(w+1<<4,256);
 		for(int i=0;i<8;i++)
-			if(chg[i]){
-				chg[i]--;
-				for(int j=0;j<chg[i]>>4;j++){
+			if(chg[ws[i]]){
+				chg[ws[i]]--;
+				for(int j=0;j<chg[ws[i]]>>4;j++){
 					glVertex2i(i<<4,257+j);
 					glVertex2i(i<<4|15,257+j);
 				}
-				glVertex2i(i<<4,257+(chg[i]>>4));
-				glVertex2i(i<<4|chg[i]&15,257+(chg[i]>>4));
+				glVertex2i(i<<4,257+(chg[ws[i]]>>4));
+				glVertex2i(i<<4|chg[ws[i]]&15,257+(chg[ws[i]]>>4));
 			}
 		glEnd();
 		glBegin(GL_POINTS);
@@ -252,7 +243,7 @@ int main(int argc,char**argv){
 			i++;
 		}
 		glEnd();
-		int k_=0;
+		int k_=0,keq=0;
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		while(XPending(dpy)){
@@ -265,6 +256,8 @@ int main(int argc,char**argv){
 				case(XK_a)kda--;
 				case(XK_s)ksw++;
 				case(XK_w)ksw--;
+				case(XK_e)keq++;
+				case(XK_q)keq--;
 				case(XK_space)k_=1;
 				case(XK_Escape)return 0;
 				}
@@ -285,6 +278,8 @@ int main(int argc,char**argv){
 			}
 		}
 		#else
+		k_=glfwGetKey(GLFW_KEY_SPACE);
+		int ke=glfwGetKey('E'),kq=glfwGetKey('Q');
 		glfwSwapBuffers();
 		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED))return 0;
 		glfwGetMousePos(&mx,&my);
@@ -295,12 +290,25 @@ int main(int argc,char**argv){
 		mb=glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT);
 		kda=glfwGetKey('D')-glfwGetKey('A');
 		ksw=glfwGetKey('S')-glfwGetKey('W');
-		k_=glfwGetKey(GLFW_KEY_SPACE);
+		keq=(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q'));
+		k_=!k_&&glfwGetKey(GLFW_KEY_SPACE);
 		#endif
+		if(keq){
+			uint8_t t=ws[w];
+			ws[w]=ws[w+keq&7];
+			ws[w+keq&7]=t;
+			w=w+keq&7;
+			mkwud();
+		}
 		if(k_){
-			FILE*lv=fopen("lv","wb");
+			FILE*lv=fopen("wb","wb");
 			if(lv){
 				fwrite(W,16,2,lv);
+				fclose(lv);
+			}
+			if(lv=fopen("rb","wb")){
+				fwrite(rgb[id],3,1,lv);
+				fwrite(ws,8,1,lv);
 				fclose(lv);
 			}
 		}
@@ -310,21 +318,15 @@ int main(int argc,char**argv){
 		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]-=kda;
 		xy[id][1]+=ksw;
 		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]-=ksw;
-		if(w==6&&!chg[6]&&!W(xy[id][2]>>4,xy[id][3]>>4)&&mb){
-			chg[6]=255;
+		if(!ws[w]&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)&&mb){
+			chg[0]=255;
 			xy[id][0]=xy[id][2];
 			xy[id][1]=xy[id][3];
 		}
 		memcpy(buff+1,xy+id,4);
 		uint8_t l=5;
-		if(w!=6&&!chg[w]&&mb){
-			switch(buff[l++]=w){
-			case(0)
-				chg[0]=30;
-				H[Hs][0]=id;
-				memcpy(H[Hs]+1,xy[id],4);
-				H[Hs][5]=0;
-				Hs++;
+		if(ws[w]&&!chg[ws[w]]&&mb){
+			switch(buff[l++]=ws[w]){
 			case(1)
 				chg[1]=120;
 				B[Bs][0]=id;
@@ -347,7 +349,13 @@ int main(int argc,char**argv){
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
 			case(5)
-				chg[5]=15;
+				chg[5]=30;
+				H[Hs][0]=id;
+				memcpy(H[Hs]+1,xy[id],4);
+				H[Hs][5]=0;
+				Hs++;
+			case(6)
+				chg[6]=15;
 				Wf(xy[id][2]>>4,xy[id][3]>>4);
 				mkhud();
 			case(7)
@@ -370,7 +378,7 @@ int main(int argc,char**argv){
 		ship(buff,l);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
-		fprintf(stderr,"%d\n",tvy.tv_usec-tvx.tv_usec);
+		printf("%d\n",tvy.tv_usec-tvx.tv_usec);
 		if(tvy.tv_usec>tvx.tv_usec)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
 		#else

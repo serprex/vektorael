@@ -1,5 +1,4 @@
 #pragma once
-#define __GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -17,7 +16,7 @@
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
 #define Wf(x,y) (W[y]^=(1<<(x)))
-int S=0;
+int S,A;
 int any(int s){
 	struct pollfd pfd={.fd=s,.events=POLLIN};
 	do s=poll(&pfd,1,0); while(s==-1);
@@ -25,15 +24,14 @@ int any(int s){
 }
 uint8_t readch(){
 	uint8_t c;
-	while(read(S,&c,1)!=1);
+	while((A=read(S,&c,1))==-1);
 	return c;
 }
 void readx(void*p,int len){
 	do{
-		int r;
-		do r=read(S,p,len); while(r<=0);
-		p+=r;
-		len-=r;
+		while((A=read(S,p,len))==-1);
+		p+=A;
+		len-=A;
 	}while(len);
 }
 void ship(void*p,int blen){
