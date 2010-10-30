@@ -1,6 +1,6 @@
-#include "net.h"
+#include "v.h"
 int lis,con[8];
-uint8_t rgb[8][3],xy[8][4],cbts=0,beif[8][256],beln[8];
+uint8_t rgb[8][3],cbts=0,beif[8][256],beln[8];
 uint16_t port,W[16];
 struct sockaddr_in addr;
 void writex(int j,const void*p,int len){
@@ -16,31 +16,28 @@ void writech(int j,uint8_t c){
 			beif[i][beln[i]++]=c;
 }
 int main(int argc,char**argv){
-	if(argc<2){
-		puts("veziovaer port");
-		return 1;
-	}else(argc>2){
+	if(argc>2){
 		FILE*lv=fopen(argv[2],"rb");
 		if(lv){
 			fread(W,16,2,lv);
 			fclose(lv);
-		}else fprintf(stderr,"fopen %s %d\n",argv[2],errno);
+		}else fprintf(stderr,"%s %d\n",argv[2],errno);
 	}
 	addr.sin_family=AF_INET;
-	port=strtol(argv[1],0,0);
+	port=argc>1?strtol(argv[1],0,0):2000;
 	if((lis=socket(AF_INET,SOCK_STREAM,0))<0){
-		fprintf(stderr,"socket %d\n",errno);
+		fprintf(stderr,"s %d\n",errno);
 		return 1;
 	}
 	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,"\1",1);
 	addr.sin_addr.s_addr=htonl(INADDR_ANY);
 	addr.sin_port=htons(port);
 	if(bind(lis,(struct sockaddr*)&addr,sizeof(addr))<0){
-		fprintf(stderr,"bind %d\n",errno);
+		fprintf(stderr,"b %d\n",errno);
 		return 1;
 	}
 	if(listen(lis,8)<0){
-		fprintf(stderr,"listen %d\n",errno);
+		fprintf(stderr,"l %d\n",errno);
 		return 1;
 	}
 	for(;;){
@@ -65,14 +62,14 @@ int main(int argc,char**argv){
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				while(any(S=con[i])){
-					uint8_t r=readch();
+					uint8_t r=readch(),xy[4];
 					writech(i,r&15|i<<5);
 					switch(r&15){
-					case(6)
-						Wf(xy[i][2]>>4,xy[i][3]>>4);
+					case(5)
+						Wf(xy[2]>>4,xy[3]>>4);
 					case(7)case 8:
-						readx(xy[i],4);
-						writex(i,xy[i],4);
+						readx(xy,4);
+						writex(i,xy,4);
 					case(9)
 						close(S);
 						beln[i]=0;

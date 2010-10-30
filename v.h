@@ -7,6 +7,7 @@
 #include <sys/unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/poll.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #define pop(x) __builtin_popcount(x)
@@ -16,9 +17,30 @@
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
 #define Wf(x,y) (W[y]^=(1<<(x)))
-uint8_t readch(void);
-void readx(void*,int);
-int any(int);
-void ship(void*,int);
-extern uint8_t cbts;
-extern int S;
+int S=0;
+int any(int s){
+	struct pollfd pfd={.fd=s,.events=POLLIN};
+	do s=poll(&pfd,1,0); while(s==-1);
+	return s;
+}
+uint8_t readch(){
+	uint8_t c;
+	while(read(S,&c,1)!=1);
+	return c;
+}
+void readx(void*p,int len){
+	do{
+		int r;
+		do r=read(S,p,len); while(r<=0);
+		p+=r;
+		len-=r;
+	}while(len);
+}
+void ship(void*p,int blen){
+	while(blen){
+		int nw;
+		do nw=write(S,p,blen); while(nw<=0);
+		p+=nw;
+		blen-=nw;
+	}
+}

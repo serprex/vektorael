@@ -5,7 +5,7 @@ struct timeval tvx,tvy;
 #else
 #include <GL/glfw.h>
 #endif
-#include "net.h"
+#include "v.h"
 #include "math.h"
 uint8_t rgb[8][3],xy[8][4],cbts,id,w,chg[8],buff[10]={8},mine,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds;
 uint16_t port,W[16];
@@ -38,11 +38,26 @@ void axit(){
 	while(write(S,&b,1)!=1);
 	close(S);
 }
+void mkhud(){
+	glNewList(hud,GL_COMPILE);
+	glCallList(hud+1);
+	for(int i=0;i<16;i++)
+		for(int j=0;j<16;j++)
+			if(W(j,i)){
+				glBegin(GL_LINE_LOOP);
+				glVertex2i(j<<4|1,i<<4|1);
+				glVertex2i(j<<4|15,i<<4|1);
+				glVertex2i(j<<4|15,i<<4|15);
+				glVertex2i(j<<4|1,i<<4|15);
+				glEnd();
+			}
+	glEndList();
+}
 int main(int argc,char**argv){
 	atexit(axit);
 	rnd=fopen("/dev/urandom","r");
 	if(argc<2){
-		puts("vektorael ip:port");
+		puts("vektorael ip[:port]");
 		return 1;
 	}
 	addr.sin_family=AF_INET;
@@ -52,16 +67,16 @@ int main(int argc,char**argv){
 		port=strtol(szPort,0,0);
 	}else port=2000;
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0){
-		fprintf(stderr,"socket %d\n",errno);
+		fprintf(stderr,"s %d\n",errno);
 		return 1;
 	}
 	addr.sin_port=htons(port);
 	if(inet_aton(argv[1],&addr.sin_addr)<=0){
-		fprintf(stderr,"ip %d\n",errno);
+		fprintf(stderr,"i %d\n",errno);
 		return 1;
 	}
 	if(connect(S,(struct sockaddr*)&addr,sizeof(addr))<0){
-		fprintf(stderr,"connect %d\n",errno);
+		fprintf(stderr,"c %d\n",errno);
 		return 1;
 	}
 	uint8_t rgb2[3]={64|fgetc(rnd),64|fgetc(rnd),64|fgetc(rnd)};
@@ -77,16 +92,17 @@ int main(int argc,char**argv){
 	#ifdef GLX
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,274,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,273,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
 	#else
 	glfwInit();
-	if(!glfwOpenWindow(256,274,0,0,0,0,0,0,GLFW_WINDOW))return 1;
+	if(!glfwOpenWindow(256,273,0,0,0,0,0,0,GLFW_WINDOW))return 1;
 	#endif
-	glOrtho(0,256,274,0,1,-1);
-	glNewList(hud=glGenLists(1),GL_COMPILE);
+	glOrtho(0,256,273,0,1,-1);
+	hud=glGenLists(2);
+	glNewList(hud+1,GL_COMPILE);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3ubv(rgb[id]);
 	glBegin(GL_LINE_STRIP);
@@ -102,6 +118,15 @@ int main(int argc,char**argv){
 	glVertex2i(107,263);
 	glVertex2i(107,266);
 	glEnd();
+	glBegin(GL_POINTS);
+	glCirc(23,265,6);
+	glCirc(23,265,4);
+	glCirc(39,265,5);
+	glCirc(55,265,7);
+	glCirc(118,263,4);
+	glCirc(122,267,4);
+	glVertex2i(55,265);
+	glEnd();
 	glBegin(GL_LINES);
 	glVertex2i(0,256);
 	glVertex2i(256,256);
@@ -114,17 +139,8 @@ int main(int argc,char**argv){
 	glVertex2i(95,257);
 	glVertex2i(81,271);
 	glEnd();
-	glBegin(GL_POINTS);
-	glCirc(23,265,6);
-	glCirc(23,265,4);
-	glCirc(39,265,5);
-	glCirc(55,265,7);
-	glCirc(118,263,4);
-	glCirc(122,267,4);
-	glVertex2i(55,265);
-	glEnd();
-	glBegin(GL_LINE_STRIP);
 	glEndList();
+	mkhud();
 	for(;;){
 		while(any(S)){
 			uint8_t r=readch();
@@ -154,6 +170,7 @@ int main(int argc,char**argv){
 				Ds++;
 			case(5)//WALL
 				Wf(xy[r>>5][2]>>4,xy[r>>5][3]>>4);
+				mkhud();
 			case(6)//MEET
 				cbts|=1<<(r>>5);
 				readx(rgb[r>>5],3);
@@ -171,27 +188,23 @@ int main(int argc,char**argv){
 			}
 		}
 		glCallList(hud);
+		glBegin(GL_LINES);
 		glVertex2i(w<<4,256);
 		glVertex2i(w<<4,273);
 		glVertex2i(w+1<<4,273);
 		glVertex2i(w+1<<4,256);
-		glEnd();
-		for(int i=0;i<16;i++)
-			for(int j=0;j<16;j++)
-				if(W(j,i)){
-					glBegin(GL_LINE_LOOP);
-					glVertex2i(j<<4|1,i<<4|1);
-					glVertex2i(j<<4|15,i<<4|1);
-					glVertex2i(j<<4|15,i<<4|15);
-					glVertex2i(j<<4|1,i<<4|15);
-					glEnd();
-				}
-		glBegin(GL_POINTS);
 		for(int i=0;i<8;i++)
 			if(chg[i]){
 				chg[i]--;
-				for(int j=0;j<chg[i];j++)glVertex2i(i<<4|j&15,258+(j>>4));
+				for(int j=0;j<chg[i]>>4;j++){
+					glVertex2i(i<<4,257+j);
+					glVertex2i(i<<4|15,257+j);
+				}
+				glVertex2i(i<<4,257+(chg[i]>>4));
+				glVertex2i(i<<4|chg[i]&15,257+(chg[i]>>4));
 			}
+		glEnd();
+		glBegin(GL_POINTS);
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
@@ -242,8 +255,8 @@ int main(int argc,char**argv){
 		int k_=0;
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
-		XEvent ev;
 		while(XPending(dpy)){
+			XEvent ev;
 			XNextEvent(dpy,&ev);
 			switch(ev.type){
 			case(KeyPress)
@@ -336,6 +349,7 @@ int main(int argc,char**argv){
 			case(5)
 				chg[5]=15;
 				Wf(xy[id][2]>>4,xy[id][3]>>4);
+				mkhud();
 			case(7)
 				if(mine=!mine){
 					chg[7]=15;

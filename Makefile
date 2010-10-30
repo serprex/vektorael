@@ -1,16 +1,11 @@
 all:vek vez
 CC=gcc -std=gnu99 -O3 -march=native -s -ffast-math
-ifeq ($(NOLTO),)
-CFLAGS=-flto
-endif
 ifneq ($(GLX),)
-CFLAGS+=-DGLX
-endif
-vek:vek.o net.o
-ifeq ($(GLX),)
-	${CC} ${CFLAGS} -o vektorael vek.o net.o -lglfw -fwhole-program
+CFLAGS=-DGLX -lGL
 else
-	${CC} ${CFLAGS} -o vektorael vek.o net.o -lGL -fwhole-program
+CFLAGS=-lglfw
 endif
-vez:vez.o net.o
-	${CC} ${CFLAGS} -o veziovaer vez.o net.o -fwhole-program
+vek:vek.c v.h
+	${CC} ${CFLAGS} vek.c -o vektorael -fwhole-program
+vez:vez.c v.h
+	${CC} ${CFLAGS} vez.c -o veziovaer -fwhole-program
