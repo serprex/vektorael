@@ -2,6 +2,7 @@
 #include <sys/time.h>
 #include <sys/poll.h>
 int S=0;
+uint8_t blen=0;
 int any(){
 	int r;
 	struct pollfd pfd={.fd=S,.events=POLLIN};
@@ -21,21 +22,6 @@ void readx(void*p,int len){
 		p+=r;
 		len-=r;
 	}while(len);
-}
-uint8_t buff[55],blen=0;//2+7*3+32
-void shipall(int*c){
-	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&c[i]!=S){
-			uint8_t l=blen;
-			void*p=buff;
-			while(l){
-				int nw;
-				do nw=write(c[i],p,l); while(nw<=0);
-				p+=nw;
-				l-=nw;
-			}
-		}
-	blen=0;
 }
 void ship(){
 	void*p=buff;
