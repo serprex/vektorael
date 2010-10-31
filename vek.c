@@ -12,12 +12,16 @@ int tvx,tvy;
 #endif
 #include "v.h"
 #include "math.h"
+#ifdef URA
+FILE*rnd;
+#else
+#include <time.h>
+#endif
 uint8_t rgb[8][3],xy[8][4],chg[8],buff[10]={8},B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts;
 _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
-FILE*rnd;
 GLuint hud;
 void glCirc(int x,int y,int r){
 	int r2=r*r,r12=r*M_SQRT1_2;
@@ -35,7 +39,11 @@ void glCirc(int x,int y,int r){
 }
 void die(){
 	for(int i=0;i<256;i++){
+		#ifdef URA
 		fread(xy+id,2,1,rnd);
+		#else
+		for(int i=0;i<2;i++)xy[id][i]=rand();
+		#endif
 		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
 	}
 }
@@ -99,9 +107,13 @@ void mkhud(){
 	glEndList();
 }
 int main(int argc,char**argv){
+	#ifdef URA
 	rnd=fopen("/dev/urandom","r");
+	#else
+	srand(time(0));
+	#endif
 	if(argc<2){
-		puts("ip [port]");
+		puts("ip[port]");
 		return 0;
 	}
 	#ifdef SDL
@@ -124,7 +136,11 @@ int main(int argc,char**argv){
 	atexit(axit);
 	#endif
 	FILE*pr=fopen("rb","rb");
+	#ifdef URA
 	fread(rgb[0],3,1,pr?:rnd);
+	#else
+	for(int i=0;i<3;i++)rgb[0][i]=rand();
+	#endif
 	if(pr)fread(ws,8,1,pr);
 	ship(rgb[0],3);
 	id=readch();
