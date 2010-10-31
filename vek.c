@@ -121,14 +121,14 @@ int main(int argc,char**argv){
 		fprintf(stderr,"%s\n",SDL_GetError());
 		return 1;
 	}
-	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,argv[1],argc>2?strtol(argv[2],0,0):2000)==-1||!(S=SDLNet_TCP_Open(&ip))){
+	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,argv[1],argc>2?atoi(argv[2]):2000)==-1||!(S=SDLNet_TCP_Open(&ip))){
 		fprintf(stderr,"%s\n",SDLNet_GetError());
 		return 1;
 	}
 	set=SDLNet_AllocSocketSet(1);
 	SDLNet_TCP_AddSocket(set,S);
 	#else
-	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?strtol(argv[2],0,0):2000)};
+	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?atoi(argv[2]):2000)};
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
@@ -136,12 +136,16 @@ int main(int argc,char**argv){
 	atexit(axit);
 	#endif
 	FILE*pr=fopen("rb","rb");
-	#ifdef URA
-	fread(rgb[0],3,1,pr?:rnd);
-	#else
-	for(int i=0;i<3;i++)rgb[0][i]=rand();
-	#endif
-	if(pr)fread(ws,8,1,pr);
+	if(pr){
+		fread(rgb[0],3,1,pr);
+		fread(ws,8,1,pr);
+	}else{
+		#ifdef URA
+		fread(rgb[0],3,1,rnd);
+		#else
+		for(int i=0;i<3;i++)rgb[0][i]=rand();
+		#endif
+	}
 	ship(rgb[0],3);
 	id=readch();
 	memcpy(rgb[id],rgb[0],3);
@@ -160,7 +164,7 @@ int main(int argc,char**argv){
 	gettimeofday(&tvx,0);
 	#elif defined SDL
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	SDL_Surface*dpy=SDL_SetVideoMode(256,273,16,SDL_OPENGL);
+	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
 	#else
 	glfwInit();
 	if(!glfwOpenWindow(256,273,0,0,0,0,0,0,GLFW_WINDOW))return 1;
