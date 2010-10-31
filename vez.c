@@ -83,7 +83,7 @@ int main(int argc,char**argv){
 					if(!A){
 						beln[i]=0;
 						cbts&=~(1<<i);
-						writech(i,i<<5|9);
+						writech(i,i<<5|10);
 						#ifdef SDL
 						SDLNet_TCP_DelSocket(set,S);
 						SDLNet_TCP_Close(S);
@@ -99,6 +99,8 @@ int main(int argc,char**argv){
 					case(7)case 8:
 						readx(xy,4);
 						writex(i,xy,4);
+					case(9)
+						writech(i,readch());
 					}
 				}nomore:;
 			}

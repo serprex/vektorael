@@ -17,8 +17,8 @@ FILE*rnd;
 #else
 #include <time.h>
 #endif
-uint8_t rgb[8][3],xy[8][4],chg[8],buff[10]={8},B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
-uint_fast8_t w,id,cbts;
+uint8_t rgb[8][3],xy[8][4],buff[12]={8},B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint_fast8_t w,id,cbts,team[8],chg[8];
 _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
@@ -216,7 +216,9 @@ int main(int argc,char**argv){
 				Bs+=2;
 			case(8)//MOVE
 				readx(xy[r>>5],4);
-			case(9)//CBTS
+			case(9)//TEAM
+				team[r>>5]=readch();
+			case(10)//CBTS
 				cbts&=~(1<<(r>>5));
 			}
 		}
@@ -244,6 +246,10 @@ int main(int argc,char**argv){
 				glColor3ubv(rgb[i]);
 				glVertex2i(xy[i][2],xy[i][3]);
 				glCirc(xy[i][0],xy[i][1],4);
+				if(team[i]){
+					glColor3ub(-!(team[i]&2),-(team[i]==4||team[i]==2),-(team[i]>2));
+					glVertex2i(xy[i][0],xy[i][1]);
+				}
 			}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]]);
@@ -286,7 +292,7 @@ int main(int argc,char**argv){
 			i++;
 		}
 		glEnd();
-		int k_=0,keq=0;
+		int k_=0,keq=0,t=team[id];
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		while(XPending(dpy)){
@@ -301,6 +307,11 @@ int main(int argc,char**argv){
 				case(XK_w)ksw--;
 				case(XK_e)keq++;
 				case(XK_q)keq--;
+				case(XK_0)team[id]=0;
+				case(XK_1)team[id]=1;
+				case(XK_2)team[id]=2;
+				case(XK_3)team[id]=3;
+				case(XK_4)team[id]=4;
 				case(XK_space)k_=1;
 				case(XK_Escape)return 0;
 				}
@@ -333,6 +344,11 @@ int main(int argc,char**argv){
 				case(SDLK_w)ksw--;
 				case(SDLK_e)keq++;
 				case(SDLK_q)keq--;
+				case(SDLK_0)team[id]=0;
+				case(SDLK_1)team[id]=1;
+				case(SDLK_2)team[id]=2;
+				case(SDLK_3)team[id]=3;
+				case(SDLK_4)team[id]=4;
 				case(SDLK_SPACE)k_=1;
 				case(SDLK_ESCAPE)return 0;
 				}
@@ -360,14 +376,16 @@ int main(int argc,char**argv){
 		glfwSwapBuffers();
 		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED))return 0;
 		glfwGetMousePos(&mx,&my);
-		if(mb=glfwGetMouseWheel()){
-			w=w+mb&7;
+		if(kda=glfwGetMouseWheel()){
+			w=w+kda&7;
 			glfwSetMouseWheel(0);
 		}
 		mb=glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT);
 		kda=glfwGetKey('D')-glfwGetKey('A');
 		ksw=glfwGetKey('S')-glfwGetKey('W');
 		keq=(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q'));
+		for(char c='0';c<='4';c++)
+			if(glfwGetKey(c))team[id]=c-'0';
 		k_=!k_&&glfwGetKey(GLFW_KEY_SPACE);
 		#endif
 		if(keq){
@@ -451,14 +469,19 @@ int main(int argc,char**argv){
 				}
 			}
 		}
+		if(t!=team[id]){
+			buff[l++]=9;
+			buff[l++]=team[id];
+		}
 		ship(buff,l);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
 		printf("%d\n",tvy.tv_usec-tvx.tv_usec);
-		if(tvy.tv_usec>tvx.tv_usec)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
+		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<33000)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
 		#elif defined SDL
 		tvy=SDL_GetTicks();
+		printf("%d\n",tvy-tvx);
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
 		tvx=SDL_GetTicks();
 		#else
