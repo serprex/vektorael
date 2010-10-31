@@ -99,7 +99,7 @@ int main(int argc,char**argv){
 					case(7)case 8:
 						readx(xy,4);
 						writex(i,xy,4);
-					case(9)
+					case(9)case 11:case 13:
 						writech(i,readch());
 					}
 				}nomore:;

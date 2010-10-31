@@ -17,7 +17,7 @@ FILE*rnd;
 #else
 #include <time.h>
 #endif
-uint8_t rgb[8][3],xy[8][4],buff[12]={8},B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint8_t rgb[8][3],core[4][4],xy[8][4],buff[/*15*/99],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts,team[8],chg[8];
 _Bool mine,mb;
 uint16_t W[16];
@@ -38,6 +38,12 @@ void glCirc(int x,int y,int r){
 	}
 }
 void die(){
+	for(int i=0;i<4;i++)
+		if(core[i][0]==id+1){
+			*bfp++=11;
+			*bfp++=i|36;
+			core[i][0]=9;
+		}
 	for(int i=0;i<256;i++){
 		#ifdef URA
 		fread(xy+id,2,1,rnd);
@@ -135,7 +141,7 @@ int main(int argc,char**argv){
 	}
 	atexit(axit);
 	#endif
-	FILE*pr=fopen("rb","rb");
+	FILE*pr=fopen("pr","rb");
 	if(pr){
 		fread(rgb[0],3,1,pr);
 		fread(ws,8,1,pr);
@@ -174,10 +180,12 @@ int main(int argc,char**argv){
 	mkwud();
 	mkhud();
 	for(;;){
+		bfp=buff;
 		while(any(S)){
 			uint8_t r=readch();
 			if(!A)return 0;
 			switch(r&15){
+			uint8_t t;
 			case(0)//MEET
 				cbts|=1<<(r>>5);
 				readx(rgb[r>>5],3);
@@ -220,6 +228,19 @@ int main(int argc,char**argv){
 				team[r>>5]=readch();
 			case(10)//CBTS
 				cbts&=~(1<<(r>>5));
+			case(11)//TOOK
+				r=readch();
+				core[r&3][0]=r>>2;
+			case(12)//CORE
+				core[team[r>>5]-1][0]=9;
+				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
+				core[team[r>>5]-1][2]=xy[r>>5][1]&240|8;
+				core[team[r>>5]-1][3]=xy[r>>5][0]>>4|xy[r>>5][1]&240;
+			case(13)//COWI
+				t=readch();
+				core[t][0]=9;
+				core[t][1]=core[t][3]<<4|8;
+				core[t][2]=core[t][3]&240|8;
 			}
 		}
 		glCallList(hud+1);
@@ -247,10 +268,32 @@ int main(int argc,char**argv){
 				glVertex2i(xy[i][2],xy[i][3]);
 				glCirc(xy[i][0],xy[i][1],4);
 				if(team[i]){
-					glColor3ub(-!(team[i]&2),-(team[i]==4||team[i]==2),-(team[i]>2));
+					glColor3ub(-(team[i]==4||team[i]==3),-(team[i]==4||team[i]==2),-(team[i]==4||team[i]==1));
 					glVertex2i(xy[i][0],xy[i][1]);
 				}
 			}
+		for(int i=0;i<4;i++){
+			if(core[i][0]){
+				if(core[i][0]!=9){
+					core[i][1]=xy[core[i][0]-1][0];
+					core[i][2]=xy[core[i][0]-1][1];
+					if(core[i][0]==id+1&&(core[i][2]&240|core[i][1]>>4)==core[team[id]-1][3]){
+						*bfp++=13;
+						*bfp++=i;
+						core[i][0]=9;
+						core[i][1]=core[i][3]<<4|8;
+						core[i][2]=core[i][3]&240|8;
+					}
+				}else(SQR(xy[id][0]-core[i][1])+SQR(xy[id][1]-core[i][2])<64&&(team[id]!=i+1||(core[i][2]&240|core[i][1]>>4)!=core[i][3])){
+					*bfp++=11;
+					*bfp++=i|id+1<<2;
+					core[i][0]=id+1;
+				}
+				glColor3ub(-(i==3||i==2),-(i==3||i==1),-(i==3||!i));
+				glCirc(core[i][1],core[i][2],2);
+				glCirc((core[i][3]&15)<<4|8,core[i][3]&240|8,3);
+			}
+		}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]]);
 			for(int j=0;j<B[i][3];j+=8)glCirc(B[i][1],B[i][2],j);
@@ -312,6 +355,14 @@ int main(int argc,char**argv){
 				case(XK_2)team[id]=2;
 				case(XK_3)team[id]=3;
 				case(XK_4)team[id]=4;
+				case(XK_5)
+					if(team[id]){
+						*bfp++=12;
+						core[team[id]-1][0]=9;
+						core[team[id]-1][1]=xy[id][0]&240|8;
+						core[team[id]-1][2]=xy[id][1]&240|8;
+						core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
+					}
 				case(XK_space)k_=1;
 				case(XK_Escape)return 0;
 				}
@@ -349,6 +400,14 @@ int main(int argc,char**argv){
 				case(SDLK_2)team[id]=2;
 				case(SDLK_3)team[id]=3;
 				case(SDLK_4)team[id]=4;
+				case(SDLK_5)
+					if(team[id]){
+						*bfp++=12;
+						core[team[id]-1][0]=9;
+						core[team[id]-1][1]=xy[id][0]&240|8;
+						core[team[id]-1][2]=xy[id][1]&240|8;
+						core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
+					}
 				case(SDLK_SPACE)k_=1;
 				case(SDLK_ESCAPE)return 0;
 				}
@@ -396,12 +455,12 @@ int main(int argc,char**argv){
 			mkwud();
 		}
 		if(k_){
-			FILE*lv=fopen("wb","wb");
+			FILE*lv=fopen("lv","wb");
 			if(lv){
 				fwrite(W,16,2,lv);
 				fclose(lv);
 			}
-			if(lv=fopen("rb","wb")){
+			if(lv=fopen("pr","wb")){
 				fwrite(rgb[id],3,1,lv);
 				fwrite(ws,8,1,lv);
 				fclose(lv);
@@ -417,10 +476,11 @@ int main(int argc,char**argv){
 			chg[0]=255;
 			memcpy(xy[id],xy[id]+2,2);
 		}
-		memcpy(buff+1,xy+id,4);
-		uint8_t l=5;
+		*bfp++=8;
+		memcpy(bfp,xy+id,4);
+		bfp+=4;
 		if(ws[w]&&!chg[ws[w]]&&mb){
-			switch(buff[l++]=ws[w]){
+			switch(*bfp++=ws[w]){
 			case(1)
 				chg[1]=120;
 				B[Bs][0]=id;
@@ -455,14 +515,14 @@ int main(int argc,char**argv){
 			case(7)
 				if(mine=!mine){
 					chg[7]=15;
-					l=5;
-					memcpy(buff+6,xy[id],4);
+					memcpy(bfp,xy[id],4);
+					bfp--;
 				}else{
 					chg[7]=240;
-					l=10;
 					B[Bs][0]=B[Bs+1][0]=id;
-					memcpy(B[Bs]+1,buff+6,2);
-					memcpy(B[Bs+1]+1,buff+8,2);
+					memcpy(B[Bs]+1,bfp,2);
+					memcpy(B[Bs+1]+1,bfp+2,2);
+					*bfp+=4;
 					B[Bs][3]=B[Bs+1][3]=0;
 					B[Bs][4]=B[Bs+1][4]=32;
 					Bs+=2;
@@ -470,22 +530,19 @@ int main(int argc,char**argv){
 			}
 		}
 		if(t!=team[id]){
-			buff[l++]=9;
-			buff[l++]=team[id];
+			*bfp++=9;
+			*bfp++=team[id];
 		}
-		ship(buff,l);
+		ship(buff,bfp-buff);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
-		printf("%d\n",tvy.tv_usec-tvx.tv_usec);
 		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<33000)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
 		#elif defined SDL
 		tvy=SDL_GetTicks();
-		printf("%d\n",tvy-tvx);
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
 		tvx=SDL_GetTicks();
 		#else
-		printf("%f\n",glfwGetTime()*1000000);
 		glfwSleep(1./30-glfwGetTime());
 		glfwSetTime(0);
 		#endif
