@@ -3,7 +3,11 @@ CC=gcc -std=gnu99 -O3 -march=native -s -ffast-math
 ifneq ($(GLX),)
 CFLAGS=-DGLX -lGL
 else
+ifneq ($(SDL),)
+CFLAGS+=-DSDL `sdl-config --cflags` `sdl-config --libs` -lSDL_net -lGL
+else
 CFLAGS=-lglfw
+endif
 endif
 vek:vek.c v.h
 	${CC} ${CFLAGS} vek.c -o vektorael -fwhole-program

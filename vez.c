@@ -1,8 +1,13 @@
 #include "v.h"
+const uint8_t one=1;
+#ifdef SDL
+TCPsocket lis,con[8];
+#else
 int lis,con[8];
-uint8_t rgb[8][3],cbts=0,beif[8][256],beln[8];
-uint16_t port,W[16];
-struct sockaddr_in addr;
+#endif
+uint8_t rgb[8][3],beif[8][256];
+uint_fast8_t cbts,beln[8];
+uint16_t W[16];
 void writex(int j,const void*p,int len){
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&i!=j){
@@ -21,30 +26,40 @@ int main(int argc,char**argv){
 		if(lv){
 			fread(W,16,2,lv);
 			fclose(lv);
-		}else fprintf(stderr,"%s%d\n",argv[2],errno);
+		}else fprintf(stderr,"%d\n",errno);
 	}
-	addr.sin_family=AF_INET;
-	port=argc>1?strtol(argv[1],0,0):2000;
+	#ifdef SDL
+	if(SDL_Init(0)==-1){
+		fprintf(stderr,"%s\n",SDL_GetError());
+		return 1;
+	}
+	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,0,argc>1?strtol(argv[1],0,0):2000)==-1||!(lis=SDLNet_TCP_Open(&ip))){
+		fprintf(stderr,"%s\n",SDLNet_GetError());
+		return 1;
+	}
+	set=SDLNet_AllocSocketSet(9);
+	SDLNet_TCP_AddSocket(set,lis);
+	#else
 	if((lis=socket(AF_INET,SOCK_STREAM,0))<0){
-		fprintf(stderr,"s%d\n",errno);
+		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
-	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,"\1",1);
-	addr.sin_addr.s_addr=htonl(INADDR_ANY);
-	addr.sin_port=htons(port);
-	if(bind(lis,(struct sockaddr*)&addr,sizeof(addr))<0){
-		fprintf(stderr,"b%d\n",errno);
+	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,&one,1);
+	struct sockaddr_in ip={.sin_family=AF_INET,.sin_addr.s_addr=htonl(INADDR_ANY),.sin_port=htons(argc>1?strtol(argv[1],0,0):2000)};
+	if(bind(lis,(struct sockaddr*)&ip,sizeof(ip))<0||listen(lis,8)<0){
+		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
-	if(listen(lis,8)<0){
-		fprintf(stderr,"l%d\n",errno);
-		return 1;
-	}
+	#endif
 	for(;;){
 		if(pop(cbts)<8&&any(lis)){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
-			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"a%d\n",errno);
+			#ifdef SDL
+			if(!(S=con[nid]=SDLNet_TCP_Accept(lis))||SDLNet_TCP_AddSocket(set,S)==-1)fprintf(stderr,"%s\n",SDLNet_GetError());
+			#else
+			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"%d\n",errno);
+			#endif
 			else{
 				uint8_t buff[55],len=2;
 				buff[0]=nid;
@@ -69,7 +84,12 @@ int main(int argc,char**argv){
 						beln[i]=0;
 						cbts&=~(1<<i);
 						writech(i,i<<5|9);
+						#ifdef SDL
+						SDLNet_TCP_DelSocket(set,S);
+						SDLNet_TCP_Close(S);
+						#else
 						close(S);
+						#endif
 						goto nomore;
 					}
 					writech(i,r&15|i<<5);
@@ -84,13 +104,18 @@ int main(int argc,char**argv){
 			}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
+				#ifdef SDL
+				SDLNet_TCP_Send(con[i],beif[i],beln[i]);
+				beln[i]=0;
+				#else
 				void*p=beif[i];
 				while(beln[i]){
 					int nw;
-					do nw=write(con[i],p,beln[i]); while(nw<=0);
+					while((nw=write(con[i],p,beln[i]))<=0);
 					p+=nw;
 					beln[i]-=nw;
 				}
+				#endif
 			}
 	}
 }

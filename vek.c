@@ -2,17 +2,23 @@
 #include <GL/glx.h>
 #include <sys/time.h>
 struct timeval tvx,tvy;
+#elif defined SDL
+#include <SDL.h>
+#include <SDL_opengl.h>
+#include <SDL_net.h>
+int tvx,tvy;
 #else
 #include <GL/glfw.h>
 #endif
 #include "v.h"
 #include "math.h"
-uint8_t rgb[8][3],xy[8][4],cbts,id,w,chg[8],buff[10]={8},mine,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint8_t rgb[8][3],xy[8][4],chg[8],buff[10]={8},B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint_fast8_t w,id,cbts;
+_Bool mine,mb;
 uint16_t W[16];
-int mx,my,mb,kda,ksw;
+int mx,my,kda,ksw;
 FILE*rnd;
 GLuint hud;
-struct sockaddr_in addr;
 void glCirc(int x,int y,int r){
 	int r2=r*r,r12=r*M_SQRT1_2;
 	for(int xc=0;xc<=r12;xc++){
@@ -33,7 +39,9 @@ void die(){
 		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
 	}
 }
+#ifndef SDL
 void axit(){close(S);}
+#endif
 void mkwud(){
 	int wi[8];
 	for(int i=0;i<8;i++)wi[ws[i]]=i<<4;
@@ -96,13 +104,25 @@ int main(int argc,char**argv){
 		puts("ip [port]");
 		return 0;
 	}
-	addr.sin_family=AF_INET;
-	addr.sin_port=htons(argc>2?strtol(argv[2],0,0):2000);
-	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&addr.sin_addr)<=0||connect(S,(struct sockaddr*)&addr,sizeof(addr))<0){
+	#ifdef SDL
+	if(SDL_Init(SDL_INIT_VIDEO)==-1){
+		fprintf(stderr,"%s\n",SDL_GetError());
+		return 1;
+	}
+	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,argv[1],argc>2?strtol(argv[2],0,0):2000)==-1||!(S=SDLNet_TCP_Open(&ip))){
+		fprintf(stderr,"%s\n",SDLNet_GetError());
+		return 1;
+	}
+	set=SDLNet_AllocSocketSet(1);
+	SDLNet_TCP_AddSocket(set,S);
+	#else
+	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?strtol(argv[2],0,0):2000)};
+	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
 	atexit(axit);
+	#endif
 	FILE*pr=fopen("rb","rb");
 	fread(rgb[0],3,1,pr?:rnd);
 	if(pr)fread(ws,8,1,pr);
@@ -122,6 +142,9 @@ int main(int argc,char**argv){
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
+	#elif defined SDL
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+	SDL_Surface*dpy=SDL_SetVideoMode(256,273,16,SDL_OPENGL);
 	#else
 	glfwInit();
 	if(!glfwOpenWindow(256,273,0,0,0,0,0,0,GLFW_WINDOW))return 1;
@@ -271,10 +294,44 @@ int main(int argc,char**argv){
 			case(ButtonPress)
 				if(ev.xbutton.button<4)mb=1;
 				else w=w+(ev.xbutton.button==4)-(ev.xbutton.button==5)&7;
-			case(ButtonRelease)mb=0;
+			case(ButtonRelease)if(ev.xbutton.button<4)mb=0;
 			case(MotionNotify)
 				mx=ev.xmotion.x;
 				my=ev.xmotion.y;
+			}
+		}
+		#elif defined SDL
+		SDL_GL_SwapBuffers();
+		SDL_Event ev;
+		while(SDL_PollEvent(&ev)){
+			switch(ev.type){
+			case(SDL_KEYDOWN)
+				switch(ev.key.keysym.sym){
+				case(SDLK_d)kda++;
+				case(SDLK_a)kda--;
+				case(SDLK_s)ksw++;
+				case(SDLK_w)ksw--;
+				case(SDLK_e)keq++;
+				case(SDLK_q)keq--;
+				case(SDLK_SPACE)k_=1;
+				case(SDLK_ESCAPE)return 0;
+				}
+			case(SDL_KEYUP)
+				switch(ev.key.keysym.sym){
+				case(SDLK_d)kda--;
+				case(SDLK_a)kda++;
+				case(SDLK_s)ksw--;
+				case(SDLK_w)ksw++;
+				}
+			case(SDL_MOUSEBUTTONDOWN)
+				if(ev.button.button<4)mb=1;
+				else w=w+(ev.button.button==4)-(ev.button.button==5)&7;
+			case(SDL_MOUSEBUTTONUP)
+				if(ev.button.button<4)mb=0;
+			case(SDL_MOUSEMOTION)
+				mx=ev.motion.x;
+				my=ev.motion.y;
+			case(SDL_QUIT)return 0;
 			}
 		}
 		#else
@@ -320,8 +377,7 @@ int main(int argc,char**argv){
 		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]-=ksw;
 		if(!ws[w]&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)&&mb){
 			chg[0]=255;
-			xy[id][0]=xy[id][2];
-			xy[id][1]=xy[id][3];
+			memcpy(xy[id],xy[id]+2,2);
 		}
 		memcpy(buff+1,xy+id,4);
 		uint8_t l=5;
@@ -381,6 +437,10 @@ int main(int argc,char**argv){
 		printf("%d\n",tvy.tv_usec-tvx.tv_usec);
 		if(tvy.tv_usec>tvx.tv_usec)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
+		#elif defined SDL
+		tvy=SDL_GetTicks();
+		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
+		tvx=SDL_GetTicks();
 		#else
 		printf("%f\n",glfwGetTime()*1000000);
 		glfwSleep(1./30-glfwGetTime());
