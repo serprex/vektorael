@@ -5,7 +5,7 @@ TCPsocket lis,con[8];
 #else
 int lis,con[8];
 #endif
-uint8_t rgb[8][3],beif[8][256];
+uint8_t rgb[8][3],beif[8][256],core[4][4],team[8];
 uint_fast8_t cbts,beln[8];
 uint16_t W[16];
 void writex(int j,const void*p,int len){
@@ -61,7 +61,7 @@ int main(int argc,char**argv){
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"%d\n",errno);
 			#endif
 			else{
-				uint8_t buff[55],len=2;
+				uint8_t buff[79],len=2;
 				buff[0]=nid;
 				buff[1]=cbts|=1<<nid;
 				for(int i=0;i<8;i++)
@@ -70,7 +70,9 @@ int main(int argc,char**argv){
 						len+=3;
 					}
 				memcpy(buff+len,W,32);
-				ship(buff,len+32);
+				memcpy(buff+len+32,core,16);
+				memcpy(buff+len+48,team,8);
+				ship(buff,len+56);
 				writech(nid,nid<<5);
 				readx(rgb[nid],3);
 				writex(nid,rgb[nid],3);
@@ -78,8 +80,9 @@ int main(int argc,char**argv){
 		}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
+				uint8_t r,xy[4];
 				while(any(S=con[i])){
-					uint8_t r=readch(),xy[4];
+					r=readch();
 					if(!A){
 						beln[i]=0;
 						cbts&=~(1<<i);
@@ -99,8 +102,21 @@ int main(int argc,char**argv){
 					case(7)case 8:
 						readx(xy,4);
 						writex(i,xy,4);
-					case(9)case 11:case 13:
-						writech(i,readch());
+					case(9)
+						writech(i,team[i]=readch());
+					case(11)
+						writech(i,r=readch());
+						core[r&3][0]=r>>2;
+					case(12)
+						core[team[i]-1][0]=9;
+						core[team[i]-1][1]=xy[0]&240|8;
+						core[team[i]-1][2]=xy[1]&240|8;
+						core[team[i]-1][3]=xy[0]>>4|xy[1]&240;
+					case(13)
+						writech(i,r=readch());
+						core[r][0]=9;
+						core[r][1]=core[r][3]<<4|8;
+						core[r][2]=core[r][3]&240|8;
 					}
 				}nomore:;
 			}

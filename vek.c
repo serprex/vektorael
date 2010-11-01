@@ -27,8 +27,8 @@ FILE*rnd;
 #else
 #include <time.h>
 #endif
-uint8_t rgb[8][3],core[4][4],xy[8][4],buff[/*15*/99],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
-uint_fast8_t w,id,cbts,team[8],chg[8];
+uint8_t rgb[8][3],core[4][4],team[8],xy[8][4],buff[/*15*/99],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint_fast8_t w,id,cbts,chg[8];
 _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
@@ -169,6 +169,8 @@ int main(int argc,char**argv){
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
 	readx(W,32);
+	readx(core,16);
+	readx(team,8);
 	die();
 	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	#ifdef GLX
@@ -195,7 +197,6 @@ int main(int argc,char**argv){
 			uint8_t r=readch();
 			if(!A)return 0;
 			switch(r&15){
-			uint8_t t;
 			case(0)//MEET
 				cbts|=1<<(r>>5);
 				readx(rgb[r>>5],3);
@@ -247,10 +248,10 @@ int main(int argc,char**argv){
 				core[team[r>>5]-1][2]=xy[r>>5][1]&240|8;
 				core[team[r>>5]-1][3]=xy[r>>5][0]>>4|xy[r>>5][1]&240;
 			case(13)//COWI
-				t=readch();
-				core[t][0]=9;
-				core[t][1]=core[t][3]<<4|8;
-				core[t][2]=core[t][3]&240|8;
+				r=readch();
+				core[r][0]=9;
+				core[r][1]=core[r][3]<<4|8;
+				core[r][2]=core[r][3]&240|8;
 			}
 		}
 		glCallList(hud+1);
@@ -345,7 +346,8 @@ int main(int argc,char**argv){
 			i++;
 		}
 		glEnd();
-		int k_=0,keq=0,t=team[id];
+		int k_=0,keq=0,t=team[id],k5=0;
+		#ifndef GLFW
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		XEvent ev;
@@ -370,14 +372,7 @@ int main(int argc,char**argv){
 				case('2')team[id]=2;
 				case('3')team[id]=3;
 				case('4')team[id]=4;
-				case('5')
-					if(team[id]&&(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3]){
-						*bfp++=12;
-						core[team[id]-1][0]=9;
-						core[team[id]-1][1]=xy[id][0]&240|8;
-						core[team[id]-1][2]=xy[id][1]&240|8;
-						core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
-					}
+				case('5')k5=1;
 				case(' ')k_=1;
 				case(XK_Escape)return 0;
 				}
@@ -391,7 +386,7 @@ int main(int argc,char**argv){
 			case(ButtonPress)
 				if(EV(button.button)<4)mb=1;
 				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
-			case(ButtonPress)if(EV(button.button)<4)mb=0;
+			case(ButtonRelease)if(EV(button.button)<4)mb=0;
 			case(MotionNotify)
 				mx=EV(motion.x);
 				my=EV(motion.y);
@@ -400,7 +395,7 @@ int main(int argc,char**argv){
 		#endif
 			}
 		}
-		#ifdef GLFW
+		#else
 		k_=glfwGetKey(GLFW_KEY_SPACE);
 		int ke=glfwGetKey('E'),kq=glfwGetKey('Q');
 		glfwSwapBuffers();
@@ -416,13 +411,7 @@ int main(int argc,char**argv){
 		keq=(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q'));
 		for(char c='0';c<='4';c++)
 			if(glfwGetKey(c))team[id]=c-'0';
-		if(glfwGetKey('5')&&team[id]&&(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3]){
-			*bfp++=12;
-			core[team[id]-1][0]=9;
-			core[team[id]-1][1]=xy[id][0]&240|8;
-			core[team[id]-1][2]=xy[id][1]&240|8;
-			core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
-		}
+		k5=glfwGetKey('5');
 		k_=!k_&&glfwGetKey(GLFW_KEY_SPACE);
 		#endif
 		if(keq){
@@ -457,6 +446,17 @@ int main(int argc,char**argv){
 		*bfp++=8;
 		memcpy(bfp,xy+id,4);
 		bfp+=4;
+		if(t!=team[id]){
+			*bfp++=9;
+			*bfp++=team[id];
+		}
+		if(k5&&team[id]&&(!core[team[id]-1][0]||(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3])){
+			*bfp++=12;
+			core[team[id]-1][0]=9;
+			core[team[id]-1][1]=xy[id][0]&240|8;
+			core[team[id]-1][2]=xy[id][1]&240|8;
+			core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
+		}
 		if(ws[w]&&!chg[ws[w]]&&mb){
 			switch(*bfp++=ws[w]){
 			case(1)
@@ -506,10 +506,6 @@ int main(int argc,char**argv){
 					Bs+=2;
 				}
 			}
-		}
-		if(t!=team[id]){
-			*bfp++=9;
-			*bfp++=team[id];
 		}
 		ship(buff,bfp-buff);
 		#ifdef GLX
