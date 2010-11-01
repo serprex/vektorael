@@ -4,11 +4,11 @@
 struct timeval tvx,tvy;
 #define KEYSYM XKeycodeToKeysym(dpy,ev.xkey.keycode,0)
 #define EV(y) ev.x##y
-#elif defined SDL
+#else
 #include <SDL.h>
 #include <SDL_opengl.h>
-#include <SDL_net.h>
-int tvx,tvy;
+#include <time.h>
+Uint32 tvx,tvy;
 #define KEYSYM ev.key.keysym.sym
 #define XK_Escape SDLK_ESCAPE
 #define KeyPress SDL_KEYDOWN
@@ -20,12 +20,8 @@ int tvx,tvy;
 #endif
 #include "v.h"
 #include "math.h"
-#ifdef URA
-FILE*rnd;
-#else
-#include <time.h>
-#endif
-uint8_t rgb[8][3],core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
+uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts,chg[8];
 _Bool mine,mb;
 uint16_t W[16];
@@ -53,15 +49,11 @@ void die(){
 			core[i][0]=9;
 		}
 	for(int i=0;i<256;i++){
-		#ifdef URA
-		fread(xy+id,2,1,rnd);
-		#else
 		for(int i=0;i<2;i++)xy[id][i]=rand();
-		#endif
 		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
 	}
 }
-#ifndef SDL
+#ifdef GLX
 void axit(){close(S);}
 #endif
 void mkwud(){
@@ -121,22 +113,17 @@ void mkhud(){
 	glEndList();
 }
 int main(int argc,char**argv){
-	#ifdef URA
-	rnd=fopen("/dev/urandom","r");
-	#else
-	srand(time(0));
-	#endif
 	if(argc<2){
-		puts("ip[port]");
-		return 0;
+		fprintf(stderr,"ip[port]");
+		return 1;
 	}
 	#ifdef SDL
 	if(SDL_Init(SDL_INIT_VIDEO)==-1){
-		fprintf(stderr,"%s\n",SDL_GetError());
+		fputs(SDL_GetError(),stderr);
 		return 1;
 	}
 	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,argv[1],argc>2?atoi(argv[2]):2000)==-1||!(S=SDLNet_TCP_Open(&ip))){
-		fprintf(stderr,"%s\n",SDLNet_GetError());
+		fputs(SDLNet_GetError(),stderr);
 		return 1;
 	}
 	set=SDLNet_AllocSocketSet(1);
@@ -151,63 +138,51 @@ int main(int argc,char**argv){
 	#endif
 	FILE*pr=fopen("pr","rb");
 	if(pr){
-		fread(rgb[0],3,1,pr);
 		fread(ws,8,1,pr);
-	}else{
-		#ifdef URA
-		fread(rgb[0],3,1,rnd);
-		#else
-		for(int i=0;i<3;i++)rgb[0][i]=rand();
-		#endif
+		fclose(pr);
 	}
-	ship(rgb[0],3);
-	uint8_t hand[73];
-	readx(hand,52/*2+32+2+12+4*/);
+	uint8_t hand[52];
+	readx(hand,52);
 	id=hand[0];
 	cbts=hand[1];
-	memcpy(rgb[id],rgb[0],3);
 	memcpy(W,hand+2,32);
 	for(int i=0;i<4;i++){
-		core[i][0]=i&1?hand[34+(i>>1)]>>4:team[34+(i>>1)]&15;
+		core[i][0]=i&1?hand[34+(i>>1)]>>4:hand[34+(i>>1)]&15;
 		memcpy(core[i]+1,hand+36+i*3,3);
 	}
 	for(int i=0;i<4;i++){
-		team[i<<1]=hand[48|i]&15;
-		team[i<<1|1]=hand[48|i]>>4;
+		team[i<<1]=hand[48+i]&15;
+		team[i<<1|1]=hand[48+i]>>4;
 	}
-	readx(hand,(pop(cbts)-1)*3);
-	bfp=hand;
-	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&i!=id){
-			memcpy(rgb[i],bfp,3);
-			bfp+=3;
-		}
-	die();
-	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	#ifdef GLX
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,273,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
+	Atom wmdel=XInternAtom(dpy,"WM_DELETE_WINDOW",False);
+	XSetWMProtocols(dpy,win,&wmdel,1);
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
-	#elif defined SDL
+	srand(tvx.tv_sec);
+	#else
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
+	srand(time(0));
 	#endif
 	glOrtho(0,256,273,0,1,-1);
 	hud=glGenLists(2);
 	mkwud();
 	mkhud();
+	die();
+	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	for(;;){
 		bfp=buff;
 		while(any(S)){
-			uint8_t r=readch();
-			if(!A)return 0;
+			int r=readch();
+			if(r==-1)return 0;
 			switch(r&15){
-			case(0)//MEET
-				cbts|=1<<(r>>5);
-				readx(rgb[r>>5],3);
+			case(0)//CBTS
+				cbts^=1<<(r>>5);
 			case(1)//BOMB
 				B[Bs][0]=r>>5;
 				memcpy(B[Bs]+1,xy[r>>5],2);
@@ -229,10 +204,10 @@ int main(int argc,char**argv){
 			case(5)//SHOT
 				H[Hs][0]=r>>5;
 				memcpy(H[Hs]+1,xy[r>>5],4);
-				H[Hs][5]=6;//5+1 for dead reckoning
+				H[Hs][5]=6;//+1 dead reckoning
 				Hs++;
 			case(6)//WALL
-				Wf(xy[r>>5][2]>>4,xy[r>>5][3]>>4);
+				Wf(xy[r>>5][2],xy[r>>5][3]);
 				mkhud();
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
@@ -245,8 +220,6 @@ int main(int argc,char**argv){
 				readx(xy[r>>5],4);
 			case(9)//TEAM
 				team[r>>5]=readch();
-			case(10)//CBTS
-				cbts&=~(1<<(r>>5));
 			case(11)//TOOK
 				r=readch();
 				core[r&3][0]=r>>2;
@@ -287,7 +260,7 @@ int main(int argc,char**argv){
 				glVertex2i(xy[i][2],xy[i][3]);
 				glCirc(xy[i][0],xy[i][1],4);
 				if(team[i]){
-					glColor3ub(-(team[i]==4||team[i]==3),-(team[i]==4||team[i]==2),-(team[i]==4||team[i]==1));
+					glColor3ubv(rgb[team[i]-1]);
 					glVertex2i(xy[i][0],xy[i][1]);
 				}
 			}
@@ -308,7 +281,7 @@ int main(int argc,char**argv){
 					*bfp++=i|id+1<<2;
 					core[i][0]=id+1;
 				}
-				glColor3ub(-(i==3||i==2),-(i==3||i==1),-(i==3||!i));
+				glColor3ubv(rgb[i]);
 				glCirc(core[i][1],core[i][2],2);
 				glCirc((core[i][3]&15)<<4|8,core[i][3]&240|8,3);
 			}
@@ -361,7 +334,7 @@ int main(int argc,char**argv){
 		while(XPending(dpy)){
 			KeySym ks;
 			XNextEvent(dpy,&ev);
-		#elif defined SDL
+		#else
 		SDL_GL_SwapBuffers();
 		SDL_Event ev;
 		while(SDL_PollEvent(&ev)){
@@ -373,7 +346,7 @@ int main(int argc,char**argv){
 				kda+=(ks=='d')-(ks=='a');
 				ksw+=(ks=='s')-(ks=='w');
 				keq+=(ks=='e')-(ks=='q');
-				if(ks>'0'&&ks<'5')team[id]=ks-'0';
+				if(ks>='0'&&ks<='4')team[id]=ks-'0';
 				else(ks=='5')k5=1;
 				else(ks==' ')k_=1;
 				else(ks==XK_Escape)return 0;
@@ -389,7 +362,10 @@ int main(int argc,char**argv){
 			case(MotionNotify)
 				mx=EV(motion.x);
 				my=EV(motion.y);
-		#ifdef SDL
+		#ifdef GLX
+			case(ClientMessage)
+				if(ev.xclient.data.l[0]==wmdel)return 0;
+		#else
 			case(SDL_QUIT)return 0;
 		#endif
 			}
@@ -412,7 +388,6 @@ int main(int argc,char**argv){
 				fclose(lv);
 			}
 			if(lv=fopen("pr","wb")){
-				fwrite(rgb[id],3,1,lv);
 				fwrite(ws,8,1,lv);
 				fclose(lv);
 			}
@@ -468,7 +443,7 @@ int main(int argc,char**argv){
 				Hs++;
 			case(6)
 				chg[6]=15;
-				Wf(xy[id][2]>>4,xy[id][3]>>4);
+				Wf(xy[id][2],xy[id][3]);
 				mkhud();
 			case(7)
 				if(mine=!mine){
@@ -480,7 +455,7 @@ int main(int argc,char**argv){
 					B[Bs][0]=B[Bs+1][0]=id;
 					memcpy(B[Bs]+1,bfp,2);
 					memcpy(B[Bs+1]+1,bfp+2,2);
-					*bfp+=4;
+					bfp+=4;
 					B[Bs][3]=B[Bs+1][3]=0;
 					B[Bs][4]=B[Bs+1][4]=32;
 					Bs+=2;
@@ -490,9 +465,9 @@ int main(int argc,char**argv){
 		ship(buff,bfp-buff);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
-		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<33000)usleep(33333-(tvy.tv_usec-tvx.tv_usec));
+		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<30000)usleep(33000-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
-		#elif defined SDL
+		#else
 		tvy=SDL_GetTicks();
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
 		tvx=SDL_GetTicks();

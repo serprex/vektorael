@@ -2,10 +2,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <errno.h>
 #ifdef SDL
 #include <SDL_net.h>
 #else
+#include <errno.h>
 #include <sys/unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -18,20 +18,18 @@
 #define else(x) else if(x)
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
-#define Wf(x,y) (W[y]^=(1<<(x)))
+#define Wf(x,y) (W[y>>4]^=(1<<(x>>4)))
 #ifdef SDL
 TCPsocket S;
 SDLNet_SocketSet set;
 IPaddress ip;
-int A;
 int any(TCPsocket s){
 	SDLNet_CheckSockets(set,1);
 	return SDLNet_SocketReady(s);
 }
-uint8_t readch(){
+int readch(){
 	uint8_t c;
-	A=SDLNet_TCP_Recv(S,&c,1);
-	return c;
+	return SDLNet_TCP_Recv(S,&c,1)?c:-1;
 }
 void readx(void*p,int len){SDLNet_TCP_Recv(S,p,len);}
 void ship(void*p,int len){SDLNet_TCP_Send(S,p,len);}
@@ -42,10 +40,11 @@ int any(int s){
 	do s=poll(&pfd,1,1); while(s==-1);
 	return s;
 }
-uint8_t readch(){
+int readch(){
 	uint8_t c;
+	ssize_t A;
 	while((A=read(S,&c,1))==-1);
-	return c;
+	return A?c:-1;
 }
 void readx(void*p,int len){
 	do{
