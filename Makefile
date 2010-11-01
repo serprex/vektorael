@@ -6,7 +6,7 @@ else
 ifneq ($(SDL),)
 CFLAGS=-DSDL `sdl-config --cflags` `sdl-config --libs` -lSDL_net -lGL
 else
-CFLAGS=-lglfw
+CFLAGS=-DGLFW -lglfw
 endif
 ifneq ($(URA),)
 CFLAGS+=-DURA

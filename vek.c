@@ -2,11 +2,21 @@
 #include <GL/glx.h>
 #include <sys/time.h>
 struct timeval tvx,tvy;
+#define KEYSYM XKeycodeToKeysym(dpy,ev.xkey.keycode,0)
+#define EV(y) ev.x##y
 #elif defined SDL
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <SDL_net.h>
 int tvx,tvy;
+#define KEYSYM ev.key.keysym.sym
+#define XK_Escape SDLK_ESCAPE
+#define KeyPress SDL_KEYDOWN
+#define KeyRelease SDL_KEYUP
+#define ButtonPress SDL_MOUSEBUTTONDOWN
+#define ButtonRelease SDL_MOUSEBUTTONUP
+#define MotionNotify SDL_MOUSEMOTION
+#define EV(y) ev.y
 #else
 #include <GL/glfw.h>
 #endif
@@ -338,98 +348,59 @@ int main(int argc,char**argv){
 		int k_=0,keq=0,t=team[id];
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
+		XEvent ev;
 		while(XPending(dpy)){
-			XEvent ev;
 			XNextEvent(dpy,&ev);
-			switch(ev.type){
-			case(KeyPress)
-				switch(XKeycodeToKeysym(dpy,ev.xkey.keycode,0)){
-				case(XK_d)kda++;
-				case(XK_a)kda--;
-				case(XK_s)ksw++;
-				case(XK_w)ksw--;
-				case(XK_e)keq++;
-				case(XK_q)keq--;
-				case(XK_0)team[id]=0;
-				case(XK_1)team[id]=1;
-				case(XK_2)team[id]=2;
-				case(XK_3)team[id]=3;
-				case(XK_4)team[id]=4;
-				case(XK_5)
-					if(team[id]){
-						*bfp++=12;
-						core[team[id]-1][0]=9;
-						core[team[id]-1][1]=xy[id][0]&240|8;
-						core[team[id]-1][2]=xy[id][1]&240|8;
-						core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
-					}
-				case(XK_space)k_=1;
-				case(XK_Escape)return 0;
-				}
-			case(KeyRelease)
-				switch(XKeycodeToKeysym(dpy,ev.xkey.keycode,0)){
-				case(XK_d)kda--;
-				case(XK_a)kda++;
-				case(XK_s)ksw--;
-				case(XK_w)ksw++;
-				}
-			case(ButtonPress)
-				if(ev.xbutton.button<4)mb=1;
-				else w=w+(ev.xbutton.button==4)-(ev.xbutton.button==5)&7;
-			case(ButtonRelease)if(ev.xbutton.button<4)mb=0;
-			case(MotionNotify)
-				mx=ev.xmotion.x;
-				my=ev.xmotion.y;
-			}
-		}
 		#elif defined SDL
 		SDL_GL_SwapBuffers();
 		SDL_Event ev;
 		while(SDL_PollEvent(&ev)){
+		#endif
 			switch(ev.type){
-			case(SDL_KEYDOWN)
-				switch(ev.key.keysym.sym){
-				case(SDLK_d)kda++;
-				case(SDLK_a)kda--;
-				case(SDLK_s)ksw++;
-				case(SDLK_w)ksw--;
-				case(SDLK_e)keq++;
-				case(SDLK_q)keq--;
-				case(SDLK_0)team[id]=0;
-				case(SDLK_1)team[id]=1;
-				case(SDLK_2)team[id]=2;
-				case(SDLK_3)team[id]=3;
-				case(SDLK_4)team[id]=4;
-				case(SDLK_5)
-					if(team[id]){
+			case(KeyPress)
+				switch(KEYSYM){
+				case('d')kda++;
+				case('a')kda--;
+				case('s')ksw++;
+				case('w')ksw--;
+				case('e')keq++;
+				case('q')keq--;
+				case('0')team[id]=0;
+				case('1')team[id]=1;
+				case('2')team[id]=2;
+				case('3')team[id]=3;
+				case('4')team[id]=4;
+				case('5')
+					if(team[id]&&(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3]){
 						*bfp++=12;
 						core[team[id]-1][0]=9;
 						core[team[id]-1][1]=xy[id][0]&240|8;
 						core[team[id]-1][2]=xy[id][1]&240|8;
 						core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
 					}
-				case(SDLK_SPACE)k_=1;
-				case(SDLK_ESCAPE)return 0;
+				case(' ')k_=1;
+				case(XK_Escape)return 0;
 				}
-			case(SDL_KEYUP)
-				switch(ev.key.keysym.sym){
-				case(SDLK_d)kda--;
-				case(SDLK_a)kda++;
-				case(SDLK_s)ksw--;
-				case(SDLK_w)ksw++;
+			case(KeyRelease)
+				switch(KEYSYM){
+				case('d')kda--;
+				case('a')kda++;
+				case('s')ksw--;
+				case('w')ksw++;
 				}
-			case(SDL_MOUSEBUTTONDOWN)
-				if(ev.button.button<4)mb=1;
-				else w=w+(ev.button.button==4)-(ev.button.button==5)&7;
-			case(SDL_MOUSEBUTTONUP)
-				if(ev.button.button<4)mb=0;
-			case(SDL_MOUSEMOTION)
-				mx=ev.motion.x;
-				my=ev.motion.y;
+			case(ButtonPress)
+				if(EV(button.button)<4)mb=1;
+				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
+			case(ButtonPress)if(EV(button.button)<4)mb=0;
+			case(MotionNotify)
+				mx=EV(motion.x);
+				my=EV(motion.y);
+		#ifdef SDL
 			case(SDL_QUIT)return 0;
+		#endif
 			}
 		}
-		#else
+		#ifdef GLFW
 		k_=glfwGetKey(GLFW_KEY_SPACE);
 		int ke=glfwGetKey('E'),kq=glfwGetKey('Q');
 		glfwSwapBuffers();
@@ -445,6 +416,13 @@ int main(int argc,char**argv){
 		keq=(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q'));
 		for(char c='0';c<='4';c++)
 			if(glfwGetKey(c))team[id]=c-'0';
+		if(glfwGetKey('5')&&team[id]&&(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3]){
+			*bfp++=12;
+			core[team[id]-1][0]=9;
+			core[team[id]-1][1]=xy[id][0]&240|8;
+			core[team[id]-1][2]=xy[id][1]&240|8;
+			core[team[id]-1][3]=xy[id][0]>>4|xy[id][1]&240;
+		}
 		k_=!k_&&glfwGetKey(GLFW_KEY_SPACE);
 		#endif
 		if(keq){
