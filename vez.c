@@ -61,18 +61,24 @@ int main(int argc,char**argv){
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"%d\n",errno);
 			#endif
 			else{
-				uint8_t buff[79],len=2;
-				buff[0]=nid;
-				buff[1]=cbts|=1<<nid;
+				uint8_t buff[73/*2+3*7+32+14+4*/],*bfp=buff;
+				*bfp++=nid;
+				*bfp++=cbts|=1<<nid;
 				for(int i=0;i<8;i++)
 					if(cbts&1<<i&&i!=nid){
-						memcpy(buff+len,rgb+i,3);
-						len+=3;
+						memcpy(bfp,rgb+i,3);
+						bfp+=3;
 					}
-				memcpy(buff+len,W,32);
-				memcpy(buff+len+32,core,16);
-				memcpy(buff+len+48,team,8);
-				ship(buff,len+56);
+				memcpy(bfp,W,32);
+				bfp+=32;
+				*bfp++=core[0][0]|core[1][0]<<4;
+				*bfp++=core[2][0]|core[3][0]<<4;
+				for(int i=0;i<4;i++){
+					memcpy(bfp,core[i]+1,3);
+					bfp+=3;
+				}
+				for(int i=0;i<4;i++)*bfp++=team[i<<1]|team[i<<1|1]<<4;
+				ship(buff,bfp-buff);
 				writech(nid,nid<<5);
 				readx(rgb[nid],3);
 				writex(nid,rgb[nid],3);

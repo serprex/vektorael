@@ -17,8 +17,6 @@ int tvx,tvy;
 #define ButtonRelease SDL_MOUSEBUTTONUP
 #define MotionNotify SDL_MOUSEMOTION
 #define EV(y) ev.y
-#else
-#include <GL/glfw.h>
 #endif
 #include "v.h"
 #include "math.h"
@@ -27,7 +25,7 @@ FILE*rnd;
 #else
 #include <time.h>
 #endif
-uint8_t rgb[8][3],core[4][4],team[8],xy[8][4],buff[/*15*/99],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint8_t rgb[8][3],core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts,chg[8];
 _Bool mine,mb;
 uint16_t W[16];
@@ -169,8 +167,16 @@ int main(int argc,char**argv){
 	for(int i=0;i<8;i++)
 		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
 	readx(W,32);
-	readx(core,16);
-	readx(team,8);
+	readx(team,2);
+	for(int i=0;i<4;i++){
+		core[i][0]=i&1?team[i>>1]>>4:team[i>>1]&15;
+		readx(core[i]+1,3);
+	}
+	for(int i=0;i<8;i+=2){
+		uint8_t r=readch();
+		team[i]=r&15;
+		team[i+1]=r>>4;
+	}
 	die();
 	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	#ifdef GLX
@@ -183,9 +189,6 @@ int main(int argc,char**argv){
 	#elif defined SDL
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
-	#else
-	glfwInit();
-	if(!glfwOpenWindow(256,273,0,0,0,0,0,0,GLFW_WINDOW))return 1;
 	#endif
 	glOrtho(0,256,273,0,1,-1);
 	hud=glGenLists(2);
@@ -221,7 +224,7 @@ int main(int argc,char**argv){
 			case(5)//SHOT
 				H[Hs][0]=r>>5;
 				memcpy(H[Hs]+1,xy[r>>5],4);
-				H[Hs][5]=0;
+				H[Hs][5]=6;//5+1 for dead reckoning
 				Hs++;
 			case(6)//WALL
 				Wf(xy[r>>5][2]>>4,xy[r>>5][3]>>4);
@@ -342,51 +345,42 @@ int main(int argc,char**argv){
 				Hs--;
 				continue;
 			}
-			if(H[i][0]!=id&&SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
+			if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
 			i++;
 		}
 		glEnd();
-		int k_=0,keq=0,t=team[id],k5=0;
-		#ifndef GLFW
+		int k_=0,keq=0,k5=0,t=team[id];
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		XEvent ev;
 		while(XPending(dpy)){
+			KeySym ks;
 			XNextEvent(dpy,&ev);
 		#elif defined SDL
 		SDL_GL_SwapBuffers();
 		SDL_Event ev;
 		while(SDL_PollEvent(&ev)){
+			SDLKey ks;
 		#endif
 			switch(ev.type){
 			case(KeyPress)
-				switch(KEYSYM){
-				case('d')kda++;
-				case('a')kda--;
-				case('s')ksw++;
-				case('w')ksw--;
-				case('e')keq++;
-				case('q')keq--;
-				case('0')team[id]=0;
-				case('1')team[id]=1;
-				case('2')team[id]=2;
-				case('3')team[id]=3;
-				case('4')team[id]=4;
-				case('5')k5=1;
-				case(' ')k_=1;
-				case(XK_Escape)return 0;
-				}
+				ks=KEYSYM;
+				kda+=(ks=='d')-(ks=='a');
+				ksw+=(ks=='w')-(ks=='s');
+				keq+=(ks=='e')-(ks=='q');
+				if(ks>'0'&&ks<'5')team[id]=ks-'0';
+				else(ks=='5')k5=1;
+				else(ks==' ')k_=1;
+				else(ks==XK_Escape)return 0;
 			case(KeyRelease)
-				switch(KEYSYM){
-				case('d')kda--;
-				case('a')kda++;
-				case('s')ksw--;
-				case('w')ksw++;
-				}
+				ks=KEYSYM;
+				kda+=(ks=='a')-(ks=='d');
+				ksw+=(ks=='s')-(ks=='w');
 			case(ButtonPress)
 				if(EV(button.button)<4)mb=1;
 				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
-			case(ButtonRelease)if(EV(button.button)<4)mb=0;
+			case(ButtonRelease)
+				if(EV(button.button)<4)mb=0;
 			case(MotionNotify)
 				mx=EV(motion.x);
 				my=EV(motion.y);
@@ -395,25 +389,10 @@ int main(int argc,char**argv){
 		#endif
 			}
 		}
-		#else
-		k_=glfwGetKey(GLFW_KEY_SPACE);
-		int ke=glfwGetKey('E'),kq=glfwGetKey('Q');
-		glfwSwapBuffers();
-		if(glfwGetKey(GLFW_KEY_ESC)||!glfwGetWindowParam(GLFW_OPENED))return 0;
-		glfwGetMousePos(&mx,&my);
-		if(kda=glfwGetMouseWheel()){
-			w=w+kda&7;
-			glfwSetMouseWheel(0);
+		if(t!=team[id]){
+			*bfp++=9;
+			*bfp++=team[id];
 		}
-		mb=glfwGetMouseButton(GLFW_MOUSE_BUTTON_LEFT);
-		kda=glfwGetKey('D')-glfwGetKey('A');
-		ksw=glfwGetKey('S')-glfwGetKey('W');
-		keq=(!ke&&glfwGetKey('E'))-(!kq&&glfwGetKey('Q'));
-		for(char c='0';c<='4';c++)
-			if(glfwGetKey(c))team[id]=c-'0';
-		k5=glfwGetKey('5');
-		k_=!k_&&glfwGetKey(GLFW_KEY_SPACE);
-		#endif
 		if(keq){
 			uint8_t t=ws[w];
 			ws[w]=ws[w+keq&7];
@@ -446,10 +425,6 @@ int main(int argc,char**argv){
 		*bfp++=8;
 		memcpy(bfp,xy+id,4);
 		bfp+=4;
-		if(t!=team[id]){
-			*bfp++=9;
-			*bfp++=team[id];
-		}
 		if(k5&&team[id]&&(!core[team[id]-1][0]||(core[team[id]-1][2]&240|core[team[id]-1][1]>>4)!=core[team[id]-1][3])){
 			*bfp++=12;
 			core[team[id]-1][0]=9;
@@ -484,7 +459,7 @@ int main(int argc,char**argv){
 				chg[5]=30;
 				H[Hs][0]=id;
 				memcpy(H[Hs]+1,xy[id],4);
-				H[Hs][5]=0;
+				H[Hs][5]=5;
 				Hs++;
 			case(6)
 				chg[6]=15;
@@ -516,9 +491,6 @@ int main(int argc,char**argv){
 		tvy=SDL_GetTicks();
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
 		tvx=SDL_GetTicks();
-		#else
-		glfwSleep(1./30-glfwGetTime());
-		glfwSetTime(0);
 		#endif
 	}
 }
