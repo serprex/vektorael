@@ -161,22 +161,27 @@ int main(int argc,char**argv){
 		#endif
 	}
 	ship(rgb[0],3);
-	id=readch();
+	uint8_t hand[73];
+	readx(hand,52/*2+32+2+12+4*/);
+	id=hand[0];
+	cbts=hand[1];
 	memcpy(rgb[id],rgb[0],3);
-	cbts=readch();
-	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&i!=id)readx(rgb[i],3);
-	readx(W,32);
-	readx(team,2);
+	memcpy(W,hand+2,32);
 	for(int i=0;i<4;i++){
-		core[i][0]=i&1?team[i>>1]>>4:team[i>>1]&15;
-		readx(core[i]+1,3);
+		core[i][0]=i&1?hand[34+(i>>1)]>>4:team[34+(i>>1)]&15;
+		memcpy(core[i]+1,hand+36+i*3,3);
 	}
-	for(int i=0;i<8;i+=2){
-		uint8_t r=readch();
-		team[i]=r&15;
-		team[i+1]=r>>4;
+	for(int i=0;i<4;i++){
+		team[i<<1]=hand[48|i]&15;
+		team[i<<1|1]=hand[48|i]>>4;
 	}
+	readx(hand,(pop(cbts)-1)*3);
+	bfp=hand;
+	for(int i=0;i<8;i++)
+		if(cbts&1<<i&&i!=id){
+			memcpy(rgb[i],bfp,3);
+			bfp+=3;
+		}
 	die();
 	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	#ifdef GLX
@@ -366,7 +371,7 @@ int main(int argc,char**argv){
 			case(KeyPress)
 				ks=KEYSYM;
 				kda+=(ks=='d')-(ks=='a');
-				ksw+=(ks=='w')-(ks=='s');
+				ksw+=(ks=='s')-(ks=='w');
 				keq+=(ks=='e')-(ks=='q');
 				if(ks>'0'&&ks<'5')team[id]=ks-'0';
 				else(ks=='5')k5=1;
@@ -375,7 +380,7 @@ int main(int argc,char**argv){
 			case(KeyRelease)
 				ks=KEYSYM;
 				kda+=(ks=='a')-(ks=='d');
-				ksw+=(ks=='s')-(ks=='w');
+				ksw+=(ks=='w')-(ks=='s');
 			case(ButtonPress)
 				if(EV(button.button)<4)mb=1;
 				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;

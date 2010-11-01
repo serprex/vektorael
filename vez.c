@@ -64,11 +64,6 @@ int main(int argc,char**argv){
 				uint8_t buff[73/*2+3*7+32+14+4*/],*bfp=buff;
 				*bfp++=nid;
 				*bfp++=cbts|=1<<nid;
-				for(int i=0;i<8;i++)
-					if(cbts&1<<i&&i!=nid){
-						memcpy(bfp,rgb+i,3);
-						bfp+=3;
-					}
 				memcpy(bfp,W,32);
 				bfp+=32;
 				*bfp++=core[0][0]|core[1][0]<<4;
@@ -78,6 +73,11 @@ int main(int argc,char**argv){
 					bfp+=3;
 				}
 				for(int i=0;i<4;i++)*bfp++=team[i<<1]|team[i<<1|1]<<4;
+				for(int i=0;i<8;i++)
+					if(cbts&1<<i&&i!=nid){
+						memcpy(bfp,rgb+i,3);
+						bfp+=3;
+					}
 				ship(buff,bfp-buff);
 				writech(nid,nid<<5);
 				readx(rgb[nid],3);
