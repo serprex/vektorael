@@ -34,7 +34,7 @@ int readch(){
 void readx(void*p,int len){SDLNet_TCP_Recv(S,p,len);}
 void ship(void*p,int len){SDLNet_TCP_Send(S,p,len);}
 #else
-int S,A;
+int S;
 int any(int s){
 	struct pollfd pfd={.fd=s,.events=POLLIN};
 	do s=poll(&pfd,1,1); while(s==-1);

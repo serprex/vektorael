@@ -21,7 +21,7 @@ Uint32 tvx,tvy;
 #include "v.h"
 #include "math.h"
 const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
-uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[256][5],Bs,H[256][6],Hs,D[256][5],Ds,ws[8]={5,1,2,3,4,0,6,7};
+uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[80][5],Bs,H[80][6],Hs,D[80][5],Ds,A[80][8],As,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts,chg[8];
 _Bool mine,mb;
 uint16_t W[16];
@@ -114,7 +114,7 @@ void mkhud(){
 }
 int main(int argc,char**argv){
 	if(argc<2){
-		fprintf(stderr,"ip[port]");
+		fprintf(stderr,"ip[port]\n");
 		return 1;
 	}
 	#ifdef SDL
@@ -201,10 +201,15 @@ int main(int argc,char**argv){
 				D[Ds][3]=hypot(xy[r>>5][0]-xy[r>>5][2],xy[r>>5][1]-xy[r>>5][3]);
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
+			case(4)//WAVE
+				A[As][0]=r>>5;
+				memcpy(A[As]+1,xy[r>>5],4);
+				A[As][5]=11;
+				As++;
 			case(5)//SHOT
 				H[Hs][0]=r>>5;
 				memcpy(H[Hs]+1,xy[r>>5],4);
-				H[Hs][5]=6;//+1 dead reckoning
+				H[Hs][5]=6;
 				Hs++;
 			case(6)//WALL
 				Wf(xy[r>>5][2],xy[r>>5][3]);
@@ -326,8 +331,31 @@ int main(int argc,char**argv){
 			if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
 			i++;
 		}
+		for(int i=0;i<As;){
+			uint8_t
+				xx=A[i][1]+(A[i][3]-A[i][1])*A[i][5]/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]),
+				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]);
+			if(A[i][0]&128)xx=(A[i][6]<<1)-xx;
+			if(A[i][0]&64)yy=(A[i][7]<<1)-yy;
+			glColor3ubv(rgb[A[i][0]&63]);
+			glVertex2i(xx,yy);
+			if(W(xx>>4,yy>>4)){
+				if(A[i][0]&192||A[i][5]++==255)goto killA;
+				if(!(xx&15)||(xx&15)==15)A[i][0]|=128;
+				if(!(yy&15)||(yy&15)==15)A[i][0]|=64;
+				A[i][6]=xx;
+				A[i][7]=yy;
+			}
+			if(A[i][5]++==255){killA:
+				memmove(A+i,A+i+1,(As-i)*8);
+				As--;
+				continue;
+			}
+			if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
+			i++;
+		}
 		glEnd();
-		int k_=0,keq=0,k5=0,t=team[id];
+		int k5=0,t=team[id];
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		XEvent ev;
@@ -341,15 +369,34 @@ int main(int argc,char**argv){
 			SDLKey ks;
 		#endif
 			switch(ev.type){
-			case(KeyPress)
+			case(KeyPress){
 				ks=KEYSYM;
+				FILE*lv;
+				int keq;
 				kda+=(ks=='d')-(ks=='a');
 				ksw+=(ks=='s')-(ks=='w');
-				keq+=(ks=='e')-(ks=='q');
+				if(keq=(ks=='e')-(ks=='q')){
+					uint8_t t=ws[w];
+					ws[w]=ws[w+keq&7];
+					ws[w+keq&7]=t;
+					w=w+keq&7;
+					mkwud();
+				}
 				if(ks>='0'&&ks<='4')team[id]=ks-'0';
 				else(ks=='5')k5=1;
-				else(ks==' ')k_=1;
+				else(ks==' '){
+					if(lv=fopen("lv","wb")){
+						fwrite(W,16,2,lv);
+						fclose(lv);
+					}
+					if(lv=fopen("pr","wb")){
+						fwrite(ws,8,1,lv);
+						fclose(lv);
+					}
+				}
 				else(ks==XK_Escape)return 0;
+				else(ks=='p')*bfp++=0;
+			}
 			case(KeyRelease)
 				ks=KEYSYM;
 				kda+=(ks=='a')-(ks=='d');
@@ -373,24 +420,6 @@ int main(int argc,char**argv){
 		if(t!=team[id]){
 			*bfp++=9;
 			*bfp++=team[id];
-		}
-		if(keq){
-			uint8_t t=ws[w];
-			ws[w]=ws[w+keq&7];
-			ws[w+keq&7]=t;
-			w=w+keq&7;
-			mkwud();
-		}
-		if(k_){
-			FILE*lv=fopen("lv","wb");
-			if(lv){
-				fwrite(W,16,2,lv);
-				fclose(lv);
-			}
-			if(lv=fopen("pr","wb")){
-				fwrite(ws,8,1,lv);
-				fclose(lv);
-			}
 		}
 		if(xy[id][2]!=mx)xy[id][2]=fcx=fmin(fmax(fcx+(mx-xy[id][2])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
 		if(xy[id][3]!=my)xy[id][3]=fcy=fmin(fmax(fcy+(my-xy[id][3])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
@@ -435,6 +464,12 @@ int main(int argc,char**argv){
 				D[Ds][3]=hypot(xy[id][0]-xy[id][2],xy[id][1]-xy[id][3]);
 				D[Ds][4]=D[Ds][3]-16;
 				Ds++;
+			case(4)
+				chg[4]=30;
+				A[As][0]=id;
+				memcpy(A[As]+1,xy[id],4);
+				A[As][5]=10;
+				As++;
 			case(5)
 				chg[5]=30;
 				H[Hs][0]=id;
