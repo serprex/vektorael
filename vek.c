@@ -28,45 +28,39 @@ _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
 GLuint hud;
+uint16_t xyv[16]__attribute__((aligned(16)));
 void glCirc(int x,int y,int r){
-#ifdef __SSE2__
 	int r2=r*r,r12=r--*3>>2,xc=0;
-	__m128i
-	xx=_mm_set1_epi16(x),yy=_mm_set1_epi16(y),
-	xo=_mm_set_epi16(0,0,0,0,r,r,-r,-r),yo=_mm_set_epi16(r,-r,r,-r,0,0,0,0),
-	xd1=_mm_set_epi16(1,1,-1,-1,0,0,0,0),yd1=_mm_set_epi16(0,0,0,0,1,-1,1,-1),
-	xd2=_mm_set_epi16(0,0,0,0,-1,-1,1,1),yd2=_mm_set_epi16(-1,1,-1,1,0,0,0,0);
+#ifdef __SSE2__
+	__m128i o1=_mm_set_epi16(r,0,-r,0,r,0,-r,0),o2=_mm_set_epi16(0,r,0,r,0,-r,0,-r);
 	goto skir;
 	do{
 		if(xc*xc+r*r>=r2){
-			xo=_mm_add_epi16(xo,xd2);
-			yo=_mm_add_epi16(yo,yd2);
+			o1=_mm_add_epi16(o1,_mm_set_epi16(-1,0,1,0,-1,0,1,0));
+			o2=_mm_add_epi16(o2,_mm_set_epi16(0,-1,0,-1,0,1,0,1));
 			r--;
 		}
 		skir:;
-		uint16_t xv[8]__attribute__((aligned(16))),yv[8]__attribute__((aligned(16)));
-		_mm_store_si128(xv,_mm_add_epi16(xx,xo));
-		_mm_store_si128(yv,_mm_add_epi16(yy,yo));
-		for(int i=0;i<8;i++)glVertex2i(xv[i],yv[i]);
-		xo=_mm_add_epi16(xo,xd1);
-		yo=_mm_add_epi16(yo,yd1);
-	}while(++xc<=r12);
+		_mm_store_si128(xyv,_mm_add_epi16(o1,_mm_set_epi16(y,x,y,x,y,x,y,x)));
+		_mm_store_si128(xyv+8,_mm_add_epi16(o2,_mm_set_epi16(y,x,y,x,y,x,y,x)));
+		glDrawArrays(GL_POINTS,0,8);
+		o1=_mm_add_epi16(o1,_mm_set_epi16(0,1,0,1,0,-1,0,-1));
+		o2=_mm_add_epi16(o2,_mm_set_epi16(1,0,-1,0,1,0,-1,0));
 #else
-	int r2=r*r,r12=r--*3>>2,xc=0;
 	goto skir;
 	do{
 		if(xc*xc+r*r>=r2)r--;
 		skir:
-		glVertex2i(x+xc,y+r);
-		glVertex2i(x+xc,y-r);
-		glVertex2i(x-xc,y+r);
-		glVertex2i(x-xc,y-r);
-		glVertex2i(x+r,y+xc);
-		glVertex2i(x+r,y-xc);
-		glVertex2i(x-r,y+xc);
-		glVertex2i(x-r,y-xc);
-	}while(++xc<=r12);
+		glVertex2i(x+xc&255,y+r&255);
+		glVertex2i(x+xc&255,y-r&255);
+		glVertex2i(x-xc&255,y+r&255);
+		glVertex2i(x-xc&255,y-r&255);
+		glVertex2i(x+r&255,y+xc&255);
+		glVertex2i(x+r&255,y-xc&255);
+		glVertex2i(x-r&255,y+xc&255);
+		glVertex2i(x-r&255,y-xc&255);
 #endif
+	}while(++xc<=r12);
 }
 void rplace(){
 	for(int i=0;i<256;i++){
@@ -113,15 +107,15 @@ void mkwud(){
 	glVertex2i(wi[0]|11,263);
 	glVertex2i(wi[0]|11,266);
 	glEnd();
-	glBegin(GL_POINTS);
 	glCirc(wi[1]|7,265,6);
 	glCirc(wi[1]|7,265,4);
 	glCirc(wi[2]|7,265,5);
 	glCirc(wi[3]|7,265,7);
 	glCirc(wi[7]|6,263,4);
 	glCirc(wi[7]|10,267,4);
-	glVertex2i(wi[3]|7,265);
-	glEnd();
+	xyv[0]=wi[3]|7;
+	xyv[1]=265;
+	glDrawArrays(GL_POINTS,0,1);
 	glBegin(GL_LINES);
 	glVertex2i(0,256);
 	glVertex2i(256,256);
@@ -214,6 +208,8 @@ int main(int argc,char**argv){
 	srand(time(0));
 	#endif
 	glOrtho(0,256,273,0,1,-1);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(2,GL_SHORT,0,xyv);
 	hud=glGenLists(2);
 	mkwud();
 	mkhud();
@@ -305,10 +301,12 @@ int main(int argc,char**argv){
 				glVertex2i(i<<4|chg[ws[i]]&15,257+(chg[ws[i]]>>4));
 			}
 		glEnd();
-		glBegin(GL_POINTS);
+		//for(int i=0;i<9999;i++)glCirc(128,128,i&127);
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
+				glCirc(xy[i][0],xy[i][1],rad[i]&127);
+				glBegin(GL_POINTS);
 				glVertex2i(xy[i][2],xy[i][3]);
 				if(rad[i]!=4){
 					if(rad[i]&128){
@@ -318,11 +316,11 @@ int main(int argc,char**argv){
 						}
 					}else rad[i]++;
 				}
-				glCirc(xy[i][0],xy[i][1],rad[i]&127);
 				if(team[i]){
 					glColor3ubv(rgb[team[i]-1]);
 					glVertex2i(xy[i][0],xy[i][1]);
 				}
+				glEnd();
 			}
 		for(int i=0;i<4;i++){
 			if(core[i][0]){
@@ -372,6 +370,7 @@ int main(int argc,char**argv){
 			}
 			i++;
 		}
+		glBegin(GL_POINTS);
 		for(int i=0;i<Hs;){
 			uint8_t
 				xx=H[i][1]+(H[i][3]-H[i][1])*H[i][5]*2/hypot(H[i][3]-H[i][1],H[i][4]-H[i][2]),
@@ -555,6 +554,7 @@ int main(int argc,char**argv){
 		ship(buff,bfp-buff);
 		#ifdef GLX
 		gettimeofday(&tvy,0);
+		printf("%d\n",tvy.tv_usec-tvx.tv_usec);
 		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<30000)usleep(33000-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
 		#else
