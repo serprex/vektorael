@@ -21,16 +21,18 @@ Uint32 tvx,tvy;
 #include "v.h"
 #include "math.h"
 const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
-uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,ws[8]={5,1,2,3,4,0,6,7};
-uint_fast8_t w,id,cbts,chg[8];
+uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
+uint_fast8_t w,id,cbts;
 _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
 GLuint hud;
 void glCirc(int x,int y,int r){
-	int r2=r*r,r12=r*M_SQRT1_2;
-	for(int xc=0;xc<=r12;xc++){
+	int r2=r*r,r12=r--*3>>2,xc=0;
+	goto skir;
+	do{
 		if(xc*xc+r*r>=r2)r--;
+		skir:
 		glVertex2i(x+xc,y+r);
 		glVertex2i(x+xc,y-r);
 		glVertex2i(x-xc,y+r);
@@ -39,19 +41,30 @@ void glCirc(int x,int y,int r){
 		glVertex2i(x+r,y-xc);
 		glVertex2i(x-r,y+xc);
 		glVertex2i(x-r,y-xc);
+	}while(++xc<=r12);
+}
+void rplace(){
+	for(int i=0;i<256;i++){
+		#if RAND_MAX>=65535
+		*(uint16_t*)&xy[id][i]=rand();
+		#else
+		for(int i=0;i<2;i++)xy[id][i]=rand();
+		#endif
+		if(!W(xy[id][0]>>4,xy[id][1]>>4))break;
 	}
 }
 void die(){
+	if(rad[id]!=4)return;
+	rad[id]=132;
+	int j=0;
 	for(int i=0;i<4;i++)
 		if(core[i][0]==id+1){
-			*bfp++=11;
+			j=1;
+			*bfp++=10;
 			*bfp++=i|36;
 			core[i][0]=9;
 		}
-	for(int i=0;i<256;i++){
-		for(int i=0;i<2;i++)xy[id][i]=rand();
-		if(!W(xy[id][0]>>4,xy[id][1]>>4))return;
-	}
+	if(!j)*bfp++=11;
 }
 #ifdef GLX
 void axit(){close(S);}
@@ -179,7 +192,7 @@ int main(int argc,char**argv){
 	hud=glGenLists(2);
 	mkwud();
 	mkhud();
-	die();
+	rplace();
 	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	for(;;){
 		bfp=buff;
@@ -222,8 +235,9 @@ int main(int argc,char**argv){
 				mkhud();
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
-				readx(B[Bs]+1,2);
-				readx(B[Bs+1]+1,2);
+				readx(xy,4);
+				memcpy(B[Bs]+1,xy,2);
+				memcpy(B[Bs+1]+1,xy+2,2);
 				B[Bs][3]=B[Bs+1][3]=0;
 				B[Bs][4]=B[Bs+1][4]=32;
 				Bs+=2;
@@ -231,9 +245,11 @@ int main(int argc,char**argv){
 				readx(xy[r>>5],4);
 			case(9)//TEAM
 				team[r>>5]=readch();
-			case(11)//TOOK
-				r=readch();
-				core[r&3][0]=r>>2;
+			case(10){//TOOK
+				int t=readch();
+				core[t&3][0]=t>>2;
+			}
+			case 11:rad[r>>5]=132;
 			case(12)//CORE
 				core[team[r>>5]-1][0]=9;
 				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
@@ -269,7 +285,15 @@ int main(int argc,char**argv){
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
 				glVertex2i(xy[i][2],xy[i][3]);
-				glCirc(xy[i][0],xy[i][1],4);
+				if(rad[i]!=4){
+					if(rad[i]&128){
+						if(--rad[i]==127){
+							rad[i]=0;
+							if(i==id)rplace();
+						}
+					}else rad[i]++;
+				}
+				glCirc(xy[i][0],xy[i][1],rad[i]&127);
 				if(team[i]){
 					glColor3ubv(rgb[team[i]-1]);
 					glVertex2i(xy[i][0],xy[i][1]);

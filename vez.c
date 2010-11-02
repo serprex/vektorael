@@ -98,7 +98,7 @@ int main(int argc,char**argv){
 						writex(i,xy,4);
 					case(9)
 						writech(i,team[i]=readch());
-					case(11)
+					case(10)
 						writech(i,r=readch());
 						core[r&3][0]=r>>2;
 					case(12)
