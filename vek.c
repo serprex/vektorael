@@ -20,6 +20,7 @@ Uint32 tvx,tvy;
 #endif
 #include "v.h"
 #include "math.h"
+#include <x86intrin.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
 uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts;
@@ -28,6 +29,29 @@ uint16_t W[16];
 int mx,my,kda,ksw;
 GLuint hud;
 void glCirc(int x,int y,int r){
+#ifdef __SSE2__
+	int r2=r*r,r12=r--*3>>2,xc=0;
+	__m128i
+	xx=_mm_set1_epi16(x),yy=_mm_set1_epi16(y),
+	xo=_mm_set_epi16(0,0,0,0,r,r,-r,-r),yo=_mm_set_epi16(r,-r,r,-r,0,0,0,0),
+	xd1=_mm_set_epi16(1,1,-1,-1,0,0,0,0),yd1=_mm_set_epi16(0,0,0,0,1,-1,1,-1),
+	xd2=_mm_set_epi16(0,0,0,0,-1,-1,1,1),yd2=_mm_set_epi16(-1,1,-1,1,0,0,0,0);
+	goto skir;
+	do{
+		if(xc*xc+r*r>=r2){
+			xo=_mm_add_epi16(xo,xd2);
+			yo=_mm_add_epi16(yo,yd2);
+			r--;
+		}
+		skir:;
+		uint16_t xv[8]__attribute__((aligned(16))),yv[8]__attribute__((aligned(16)));
+		_mm_store_si128(xv,_mm_add_epi16(xx,xo));
+		_mm_store_si128(yv,_mm_add_epi16(yy,yo));
+		for(int i=0;i<8;i++)glVertex2i(xv[i],yv[i]);
+		xo=_mm_add_epi16(xo,xd1);
+		yo=_mm_add_epi16(yo,yd1);
+	}while(++xc<=r12);
+#else
 	int r2=r*r,r12=r--*3>>2,xc=0;
 	goto skir;
 	do{
@@ -42,6 +66,7 @@ void glCirc(int x,int y,int r){
 		glVertex2i(x-r,y+xc);
 		glVertex2i(x-r,y-xc);
 	}while(++xc<=r12);
+#endif
 }
 void rplace(){
 	for(int i=0;i<256;i++){

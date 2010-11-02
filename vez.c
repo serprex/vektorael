@@ -87,7 +87,7 @@ int main(int argc,char**argv){
 						#else
 						close(S);
 						#endif
-						goto nomore;
+						break;
 					}
 					writech(i,r&15|i<<5);
 					switch(r&15){
@@ -112,7 +112,7 @@ int main(int argc,char**argv){
 						core[r][1]=core[r][3]<<4|8;
 						core[r][2]=core[r][3]&240|8;
 					}
-				}nomore:;
+				}
 			}
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
