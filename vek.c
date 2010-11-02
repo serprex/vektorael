@@ -21,7 +21,7 @@ Uint32 tvx,tvy;
 #include "v.h"
 #include "math.h"
 const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
-uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[80][5],Bs,H[80][6],Hs,D[80][5],Ds,A[80][8],As,ws[8]={5,1,2,3,4,0,6,7};
+uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts,chg[8];
 _Bool mine,mb;
 uint16_t W[16];
@@ -89,6 +89,12 @@ void mkwud(){
 	glVertex2i(256,256);
 	glVertex2i(wi[2]|8,258);
 	glVertex2i(wi[2]|8,265);
+	glVertex2i(wi[4]|2,257);
+	glVertex2i(wi[4]|14,257);
+	glVertex2i(wi[4]|2,271);
+	glVertex2i(wi[4]|8,257);
+	glVertex2i(wi[4]|8,257);
+	glVertex2i(wi[4]|14,271);
 	glVertex2i(wi[5]|1,257);
 	glVertex2i(wi[5]|15,271);
 	glVertex2i(wi[6]|1,257);
@@ -204,7 +210,7 @@ int main(int argc,char**argv){
 			case(4)//WAVE
 				A[As][0]=r>>5;
 				memcpy(A[As]+1,xy[r>>5],4);
-				A[As][5]=11;
+				A[As][5]=7;
 				As++;
 			case(5)//SHOT
 				H[Hs][0]=r>>5;
@@ -333,16 +339,16 @@ int main(int argc,char**argv){
 		}
 		for(int i=0;i<As;){
 			uint8_t
-				xx=A[i][1]+(A[i][3]-A[i][1])*A[i][5]/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]),
-				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]);
+				xx=A[i][1]+(A[i][3]-A[i][1])*A[i][5]*1.5/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]),
+				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]*1.5/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]);
 			if(A[i][0]&128)xx=(A[i][6]<<1)-xx;
 			if(A[i][0]&64)yy=(A[i][7]<<1)-yy;
 			glColor3ubv(rgb[A[i][0]&63]);
 			glVertex2i(xx,yy);
 			if(W(xx>>4,yy>>4)){
 				if(A[i][0]&192||A[i][5]++==255)goto killA;
-				if(!(xx&15)||(xx&15)==15)A[i][0]|=128;
-				if(!(yy&15)||(yy&15)==15)A[i][0]|=64;
+				if((xx&15)<2||(xx&15)>13)A[i][0]|=128;
+				if((yy&15)<2||(yy&15)>13)A[i][0]|=64;
 				A[i][6]=xx;
 				A[i][7]=yy;
 			}
@@ -468,7 +474,7 @@ int main(int argc,char**argv){
 				chg[4]=30;
 				A[As][0]=id;
 				memcpy(A[As]+1,xy[id],4);
-				A[As][5]=10;
+				A[As][5]=6;
 				As++;
 			case(5)
 				chg[5]=30;

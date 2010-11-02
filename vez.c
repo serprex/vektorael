@@ -65,11 +65,8 @@ int main(int argc,char**argv){
 				buff[0]=nid;
 				buff[1]=cbts|=1<<nid;
 				memcpy(buff+2,W,32);
-				buff[34]=core[0][0]|core[1][0]<<4;
-				buff[35]=core[2][0]|core[3][0]<<4;
-				for(int i=0;i<4;i++){
-					memcpy(buff+36+i*3,core[i]+1,3);
-				}
+				for(int i=0;i<2;i++)buff[34+i]=core[i<<1][0]|core[i<<1|1][0]<<4;
+				for(int i=0;i<4;i++)memcpy(buff+36+i*3,core[i]+1,3);
 				for(int i=0;i<4;i++)buff[48+i]=team[i<<1]|team[i<<1|1]<<4;
 				ship(buff,52);
 				writech(nid,nid<<5);
