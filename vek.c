@@ -28,9 +28,10 @@ _Bool mine,mb;
 uint16_t W[16];
 int mx,my,kda,ksw;
 GLuint hud;
-uint16_t xyv[16]__attribute__((aligned(16)));
+uint16_t xyv[1520]__attribute__((aligned(16)));
 void glCirc(int x,int y,int r){
 	int r2=r*r,r12=r--*3>>2,xc=0;
+	uint16_t*xyp=xyv;
 #ifdef __SSE2__
 	__m128i o1=_mm_set_epi16(r,0,-r,0,r,0,-r,0),o2=_mm_set_epi16(0,r,0,r,0,-r,0,-r);
 	goto skir;
@@ -40,27 +41,26 @@ void glCirc(int x,int y,int r){
 			o2=_mm_add_epi16(o2,_mm_set_epi16(0,-1,0,-1,0,1,0,1));
 			r--;
 		}
-		skir:;
-		_mm_store_si128(xyv,_mm_add_epi16(o1,_mm_set_epi16(y,x,y,x,y,x,y,x)));
-		_mm_store_si128(xyv+8,_mm_add_epi16(o2,_mm_set_epi16(y,x,y,x,y,x,y,x)));
-		glDrawArrays(GL_POINTS,0,8);
+		skir:
+		_mm_store_si128((void*)xyp,_mm_add_epi16(o1,_mm_set_epi16(y,x,y,x,y,x,y,x)));
+		_mm_store_si128((void*)xyp+16,_mm_add_epi16(o2,_mm_set_epi16(y,x,y,x,y,x,y,x)));
 		o1=_mm_add_epi16(o1,_mm_set_epi16(0,1,0,1,0,-1,0,-1));
 		o2=_mm_add_epi16(o2,_mm_set_epi16(1,0,-1,0,1,0,-1,0));
+		xyp+=16;
+	}while(++xc<=r12);
+	glDrawArrays(GL_POINTS,0,xyp-xyv>>1);
 #else
 	goto skir;
 	do{
 		if(xc*xc+r*r>=r2)r--;
 		skir:
-		glVertex2i(x+xc&255,y+r&255);
-		glVertex2i(x+xc&255,y-r&255);
-		glVertex2i(x-xc&255,y+r&255);
-		glVertex2i(x-xc&255,y-r&255);
-		glVertex2i(x+r&255,y+xc&255);
-		glVertex2i(x+r&255,y-xc&255);
-		glVertex2i(x-r&255,y+xc&255);
-		glVertex2i(x-r&255,y-xc&255);
-#endif
+		for(int i=0;i<8;i++){
+			*xyp++=x+(i<4?(i&2?-xc:xc):(i&2?-r:r));
+			*xyp++=y+(i<4?(i&1?-r:r):(i&1?-xc:xc));
+		}
 	}while(++xc<=r12);
+	glDrawArrays(GL_POINTS,0,xyp-xyv>>1);
+#endif
 }
 void rplace(){
 	for(int i=0;i<256;i++){
@@ -73,8 +73,8 @@ void rplace(){
 	}
 }
 void die(){
-	if(rad[id]!=4)return;
-	rad[id]=132;
+	if(rad[id]!=32)return;
+	rad[id]=160;
 	int j=0;
 	for(int i=0;i<4;i++)
 		if(core[i][0]==id+1){
@@ -94,19 +94,11 @@ void mkwud(){
 	glNewList(hud+1,GL_COMPILE);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3ubv(rgb[id]);
-	glBegin(GL_LINE_STRIP);
-	glVertex2i(wi[0]|1,258);
-	glVertex2i(wi[0]|15,258);
-	glVertex2i(wi[0]|15,272);
-	glVertex2i(wi[0]|3,272);
-	glVertex2i(wi[0]|3,260);
-	glVertex2i(wi[0]|13,260);
-	glVertex2i(wi[0]|13,270);
-	glVertex2i(wi[0]|5,270);
-	glVertex2i(wi[0]|5,263);
-	glVertex2i(wi[0]|11,263);
-	glVertex2i(wi[0]|11,266);
-	glEnd();
+	for(int i=0;i<11;i++){
+		xyv[i<<1]=wi[0]|1+(i+1&2?14-(i+1>>1):i+1>>1);
+		xyv[i<<1|1]=258+(i&2?14-(i>>1):i>>1);
+	}
+	glDrawArrays(GL_LINE_STRIP,0,11);
 	glCirc(wi[1]|7,265,6);
 	glCirc(wi[1]|7,265,4);
 	glCirc(wi[2]|7,265,5);
@@ -207,7 +199,7 @@ int main(int argc,char**argv){
 	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
 	srand(time(0));
 	#endif
-	glOrtho(0,256,273,0,1,-1);
+	glOrtho(0,255,272,0,1,-1);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(2,GL_SHORT,0,xyv);
 	hud=glGenLists(2);
@@ -236,11 +228,17 @@ int main(int argc,char**argv){
 				B[Bs][4]=48;
 				Bs++;
 			case(3)//DOME
-				D[Ds][0]=r>>5;
-				memcpy(D[Ds]+1,xy[r>>5],2);
 				D[Ds][3]=hypot(xy[r>>5][0]-xy[r>>5][2],xy[r>>5][1]-xy[r>>5][3]);
-				D[Ds][4]=D[Ds][3]-16;
-				Ds++;
+				if(D[Ds][3]>xy[r>>5][0])D[Ds][3]=xy[r>>5][0];
+				if(D[Ds][3]>xy[r>>5][1])D[Ds][3]=xy[r>>5][1];
+				if(D[Ds][3]>255-xy[r>>5][0])D[Ds][3]=255-xy[r>>5][0];
+				if(D[Ds][3]>255-xy[r>>5][1])D[Ds][3]=255-xy[r>>5][1];
+				if(D[Ds][3]>16){
+					D[Ds][0]=r>>5;
+					memcpy(D[Ds]+1,xy[r>>5],2);
+					D[Ds][4]=D[Ds][3]-16;
+					Ds++;
+				}
 			case(4)//WAVE
 				A[As][0]=r>>5;
 				memcpy(A[As]+1,xy[r>>5],4);
@@ -270,7 +268,7 @@ int main(int argc,char**argv){
 				int t=readch();
 				core[t&3][0]=t>>2;
 			}
-			case 11:rad[r>>5]=132;
+			case 11:rad[r>>5]=160;
 			case(12)//CORE
 				core[team[r>>5]-1][0]=9;
 				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
@@ -301,17 +299,16 @@ int main(int argc,char**argv){
 				glVertex2i(i<<4|chg[ws[i]]&15,257+(chg[ws[i]]>>4));
 			}
 		glEnd();
-		//for(int i=0;i<9999;i++)glCirc(128,128,i&127);
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
-				glCirc(xy[i][0],xy[i][1],rad[i]&127);
+				glCirc(xy[i][0],xy[i][1],(rad[i]&127)>>3);
 				glBegin(GL_POINTS);
 				glVertex2i(xy[i][2],xy[i][3]);
-				if(rad[i]!=4){
+				if(rad[i]!=32){
 					if(rad[i]&128){
-						if(--rad[i]==127){
-							rad[i]=0;
+						if(--rad[i]==136){
+							rad[i]=8;
 							if(i==id)rplace();
 						}
 					}else rad[i]++;
@@ -359,7 +356,7 @@ int main(int argc,char**argv){
 		}
 		for(int i=0;i<Ds;){
 			glColor3ubv(rgb[D[i][0]]);
-			for(int j=D[i][3]-16;j<=D[i][4];j+=2)glCirc(D[i][1],D[i][2],j);
+			for(int j=D[i][3]-16;j<=D[i][4];j+=3)glCirc(D[i][1],D[i][2],j);
 			glCirc(D[i][1],D[i][2],D[i][3]);
 			D[i][4]+=2;
 			if(D[i][4]==D[i][3]){
@@ -370,13 +367,16 @@ int main(int argc,char**argv){
 			}
 			i++;
 		}
-		glBegin(GL_POINTS);
+		uint8_t ahco[160][3];
+		uint_fast16_t ahp=0;
 		for(int i=0;i<Hs;){
 			uint8_t
 				xx=H[i][1]+(H[i][3]-H[i][1])*H[i][5]*2/hypot(H[i][3]-H[i][1],H[i][4]-H[i][2]),
 				yy=H[i][2]+(H[i][4]-H[i][2])*H[i][5]*2/hypot(H[i][3]-H[i][1],H[i][4]-H[i][2]);
-			glColor3ubv(rgb[H[i][0]]);
-			glVertex2i(xx,yy);
+			memcpy(ahco[ahp],rgb[H[i][0]],3);
+			xyv[ahp<<1]=xx;
+			xyv[ahp<<1|1]=yy;
+			ahp++;
 			if(W(xx>>4,yy>>4)||H[i][5]++==255){
 				memmove(H+i,H+i+1,(Hs-i)*6);
 				Hs--;
@@ -391,8 +391,10 @@ int main(int argc,char**argv){
 				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]*1.5/hypot(A[i][3]-A[i][1],A[i][4]-A[i][2]);
 			if(A[i][0]&128)xx=(A[i][6]<<1)-xx;
 			if(A[i][0]&64)yy=(A[i][7]<<1)-yy;
-			glColor3ubv(rgb[A[i][0]&63]);
-			glVertex2i(xx,yy);
+			memcpy(ahco[ahp],rgb[A[i][0]&63],3);
+			xyv[ahp<<1]=xx;
+			xyv[ahp<<1|1]=yy;
+			ahp++;
 			if(W(xx>>4,yy>>4)){
 				if(A[i][0]&192||A[i][5]++==255)goto killA;
 				if((xx&15)<2||(xx&15)>13)A[i][0]|=128;
@@ -408,7 +410,12 @@ int main(int argc,char**argv){
 			if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
 			i++;
 		}
-		glEnd();
+		if(ahp){
+			glEnableClientState(GL_COLOR_ARRAY);
+			glColorPointer(3,GL_UNSIGNED_BYTE,0,ahco);
+			glDrawArrays(GL_POINTS,0,ahp);
+			glDisableClientState(GL_COLOR_ARRAY);
+		}
 		int k5=0,t=team[id];
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
@@ -512,12 +519,18 @@ int main(int argc,char**argv){
 				B[Bs][4]=48;
 				Bs++;
 			case(3)
-				chg[3]=150;
-				D[Ds][0]=id;
-				memcpy(D[Ds]+1,xy[id],2);
 				D[Ds][3]=hypot(xy[id][0]-xy[id][2],xy[id][1]-xy[id][3]);
-				D[Ds][4]=D[Ds][3]-16;
-				Ds++;
+				if(D[Ds][3]>xy[id][0])D[Ds][3]=xy[id][0];
+				if(D[Ds][3]>xy[id][1])D[Ds][3]=xy[id][1];
+				if(D[Ds][3]>255-xy[id][0])D[Ds][3]=255-xy[id][0];
+				if(D[Ds][3]>255-xy[id][1])D[Ds][3]=255-xy[id][1];
+				if(D[Ds][3]>16){
+					chg[3]=150;
+					D[Ds][0]=id;
+					memcpy(D[Ds]+1,xy[id],2);
+					D[Ds][4]=D[Ds][3]-16;
+					Ds++;
+				}
 			case(4)
 				chg[4]=30;
 				A[As][0]=id;
