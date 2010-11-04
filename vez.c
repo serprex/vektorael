@@ -79,6 +79,9 @@ int main(int argc,char**argv){
 						beln[i]=0;
 						cbts&=~(1<<i);
 						writech(i,i<<5);
+						team[i]=0;
+						for(int j=0;j<4;j++)
+							if(core[j][0]==i+1)core[j][0]=9;
 						#ifdef SDL
 						SDLNet_TCP_DelSocket(set,S);
 						SDLNet_TCP_Close(S);
@@ -87,8 +90,8 @@ int main(int argc,char**argv){
 						#endif
 						break;
 					}
-					writech(i,r&15|i<<5);
-					switch(r&15){
+					writech(i,r&31|i<<5);
+					switch(r&31){
 					case(6)
 						Wf(xy[2],xy[3]);
 					case(7)case 8:
@@ -97,18 +100,20 @@ int main(int argc,char**argv){
 					case(9)
 						writech(i,team[i]=readch());
 					case(10)
-						writech(i,r=readch());
-						core[r&3][0]=r>>2;
+						for(int j=0;j<4;j++)
+							if(core[j][0]==i+1)core[j][0]=9;
 					case(12)
 						core[team[i]-1][0]=9;
 						core[team[i]-1][1]=xy[0]&240|8;
 						core[team[i]-1][2]=xy[1]&240|8;
 						core[team[i]-1][3]=xy[0]>>4|xy[1]&240;
 					case(13)
-						writech(i,r=readch());
-						core[r][0]=9;
-						core[r][1]=core[r][3]<<4|8;
-						core[r][2]=core[r][3]&240|8;
+						writech(i,r>>5);
+						core[r>>5][0]=9;
+						core[r>>5][1]=core[r>>5][3]<<4|8;
+						core[r>>5][2]=core[r>>5][3]&240|8;
+					case(14 ... 17)
+						core[(r&31)-14][0]=i+1;
 					}
 				}
 			}

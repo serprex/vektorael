@@ -78,7 +78,6 @@ void die(){
 	for(int i=0;i<4;i++)
 		if(core[i][0]==id+1){
 			*bfp++=10;
-			*bfp++=i|36;
 			core[i][0]=9;
 			return;
 		}
@@ -206,9 +205,14 @@ int main(int argc,char**argv){
 		while(any(S)){
 			int r=readch();
 			if(r==-1)return 0;
-			switch(r&15){
+			switch(r&31){
 			case(0)//CBTS
 				cbts^=1<<(r>>5);
+				if(!(cbts&1<<(r>>5))){
+					team[r>>5]=0;
+					for(int i=0;i<4;i++)
+						if(core[i][0]==(r>>5)+1)core[i][0]=9;
+				}
 			case(1)//BOMB
 				B[Bs][0]=r>>5;
 				memcpy(B[Bs]+1,xy[r>>5],2);
@@ -259,9 +263,9 @@ int main(int argc,char**argv){
 			case(9)//TEAM
 				team[r>>5]=readch();
 			case(10)//TOOK
-				int t=readch();
-				core[t&3][0]=t>>2;
-			if(t>=36)case 11:rad[r>>5]=160;
+				for(int i=0;i<4;i++)
+					if(core[i][0]==(r>>5)+1)core[i][0]=9;
+			case 11:rad[r>>5]=160;
 			case(12)//CORE
 				core[team[r>>5]-1][0]=9;
 				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
@@ -272,6 +276,8 @@ int main(int argc,char**argv){
 				core[r][0]=9;
 				core[r][1]=core[r][3]<<4|8;
 				core[r][2]=core[r][3]&240|8;
+			case(14 ... 17)
+				core[(r&31)-14][0]=(r>>5)+1;
 			}
 		}
 		glCallList(hud+1);
@@ -317,8 +323,7 @@ int main(int argc,char**argv){
 				if(core[i][0]!=9){
 					memcpy(core[i]+1,xy[core[i][0]-1],2);
 					if(core[i][0]==id+1&&(core[i][2]&240|core[i][1]>>4)==core[team[id]-1][3]){
-						*bfp++=13;
-						*bfp++=i;
+						*bfp++=13|i<<5;
 						core[i][0]=9;
 						core[i][1]=core[i][3]<<4|8;
 						core[i][2]=core[i][3]&240|8;
@@ -328,8 +333,7 @@ int main(int argc,char**argv){
 					for(int i=0;i<4;i++)
 						if(core[i][0]==id+1)j=0;
 					if(j){
-						*bfp++=10;
-						*bfp++=i|id+1<<2;
+						*bfp++=14+i;
 						core[i][0]=id+1;
 					}
 				}
