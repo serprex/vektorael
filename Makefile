@@ -1,5 +1,5 @@
 v:vek vez
-CC=gcc -std=gnu99 -Os -march=native -s -ffast-math -lGL -fwhole-program -o
+CC=gcc -std=gnu99 -Os -march=native -g -ffast-math -lGL -fwhole-program -o
 ifneq ($(GLX),)
 CFLAGS=-DGLX
 else

@@ -22,7 +22,7 @@ Uint32 tvx,tvy;
 #include "math.h"
 #include <x86intrin.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t core[4][4],team[8],xy[8][4],buff[14/*2+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
+uint8_t core[4][4],team[8],xy[8][4],buff[13/*1+1+5+1+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts;
 _Bool mine,mb;
 uint16_t W[16];
@@ -65,7 +65,7 @@ void glCirc(int x,int y,int r){
 void rplace(){
 	for(int i=0;i<256;i++){
 		#if RAND_MAX>=65535
-		*(uint16_t*)&xy[id][i]=rand();
+		*(uint16_t*)(xy+id)=rand();
 		#else
 		for(int i=0;i<2;i++)xy[id][i]=rand();
 		#endif
@@ -73,36 +73,32 @@ void rplace(){
 	}
 }
 void die(){
-	if(rad[id]!=32)return;
-	rad[id]=160;
+	if(rad[id]!=64)return;
+	rad[id]=192;
+	*bfp++=10;
 	for(int i=0;i<4;i++)
-		if(core[i][0]==id+1){
-			*bfp++=10;
-			core[i][0]=9;
-			return;
-		}
-	*bfp++=11;
+		if(core[i][0]==id+1)core[i][0]=9;
 }
 void mkwud(){
 	uint_fast8_t wi[8];
 	for(int i=0;i<8;i++)wi[ws[i]]=i<<4;
-	glNewList(hud+1,GL_COMPILE);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glColor3ubv(rgb[id]);
 	for(int i=0;i<11;i++){
 		xyv[i<<1]=wi[0]|1+(i+1&2?14-(i+1>>1):i+1>>1);
 		xyv[i<<1|1]=258+(i&2?14-(i>>1):i>>1);
 	}
+	glNewList(hud+1,GL_COMPILE);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glColor3ubv(rgb[id]);
 	glDrawArrays(GL_LINE_STRIP,0,11);
+	xyv[0]=wi[3]|8;
+	xyv[1]=265;
+	glDrawArrays(GL_POINTS,0,1);
 	glCirc(wi[1]|8,265,6);
 	glCirc(wi[1]|8,265,4);
 	glCirc(wi[2]|8,265,5);
 	glCirc(wi[3]|8,265,7);
 	glCirc(wi[7]|6,263,4);
 	glCirc(wi[7]|10,267,4);
-	xyv[0]=wi[3]|8;
-	xyv[1]=265;
-	glDrawArrays(GL_POINTS,0,1);
 	glBegin(GL_LINES);
 	glVertex2i(0,256);
 	glVertex2i(256,256);
@@ -206,6 +202,7 @@ int main(int argc,char**argv){
 			int r=readch();
 			if(r==-1)return 0;
 			switch(r&31){
+			uint8_t b4[4];
 			case(0)//CBTS
 				cbts^=1<<(r>>5);
 				if(!(cbts&1<<(r>>5))){
@@ -252,9 +249,9 @@ int main(int argc,char**argv){
 				mkhud();
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
-				readx(xy,4);
-				memcpy(B[Bs]+1,xy,2);
-				memcpy(B[Bs+1]+1,xy+2,2);
+				readx(b4,4);
+				memcpy(B[Bs]+1,b4,2);
+				memcpy(B[Bs+1]+1,b4+2,2);
 				B[Bs][3]=B[Bs+1][3]=0;
 				B[Bs][4]=B[Bs+1][4]=32;
 				Bs+=2;
@@ -265,17 +262,19 @@ int main(int argc,char**argv){
 			case(10)//TOOK
 				for(int i=0;i<4;i++)
 					if(core[i][0]==(r>>5)+1)core[i][0]=9;
-			case 11:rad[r>>5]=160;
+			rad[r>>5]=192;
 			case(12)//CORE
 				core[team[r>>5]-1][0]=9;
 				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
 				core[team[r>>5]-1][2]=xy[r>>5][1]&240|8;
 				core[team[r>>5]-1][3]=xy[r>>5][0]>>4|xy[r>>5][1]&240;
 			case(13)//COWI
-				r=readch();
-				core[r][0]=9;
-				core[r][1]=core[r][3]<<4|8;
-				core[r][2]=core[r][3]&240|8;
+				for(int j=0;j<4;j++)
+					if(core[j][0]==(r>>5)+1){
+						core[j][0]=9;
+						core[j][1]=core[j][3]<<4|8;
+						core[j][2]=core[j][3]&240|8;
+					}
 			case(14 ... 17)
 				core[(r&31)-14][0]=(r>>5)+1;
 			}
@@ -301,13 +300,13 @@ int main(int argc,char**argv){
 		for(int i=0;i<8;i++)
 			if(cbts&1<<i){
 				glColor3ubv(rgb[i]);
-				glCirc(xy[i][0],xy[i][1],(rad[i]&127)>>3);
+				glCirc(xy[i][0],xy[i][1],(rad[i]&127)>>4);
 				glBegin(GL_POINTS);
 				glVertex2i(xy[i][2],xy[i][3]);
-				if(rad[i]!=32){
+				if(rad[i]!=64){
 					if(rad[i]&128){
-						if(--rad[i]==136){
-							rad[i]=8;
+						if(--rad[i]==144){
+							rad[i]=16;
 							if(i==id)rplace();
 						}
 					}else rad[i]++;
@@ -323,12 +322,12 @@ int main(int argc,char**argv){
 				if(core[i][0]!=9){
 					memcpy(core[i]+1,xy[core[i][0]-1],2);
 					if(core[i][0]==id+1&&(core[i][2]&240|core[i][1]>>4)==core[team[id]-1][3]){
-						*bfp++=13|i<<5;
+						*bfp++=13;
 						core[i][0]=9;
 						core[i][1]=core[i][3]<<4|8;
 						core[i][2]=core[i][3]&240|8;
 					}
-				}else(SQR(xy[id][0]-core[i][1])+SQR(xy[id][1]-core[i][2])<64&&rad[id]==32&&(team[id]!=i+1||(core[i][2]&240|core[i][1]>>4)!=core[i][3])){
+				}else(SQR(xy[id][0]-core[i][1])+SQR(xy[id][1]-core[i][2])<64&&rad[id]==64&&(team[id]!=i+1||(core[i][2]&240|core[i][1]>>4)!=core[i][3])){
 					int j=1;
 					for(int i=0;i<4;i++)
 						if(core[i][0]==id+1)j=0;
@@ -397,8 +396,8 @@ int main(int argc,char**argv){
 			ahp++;
 			if(W(xx>>4,yy>>4)){
 				if(A[i][0]&192||A[i][5]++==255)goto killA;
-				if(((xx&15)<2&&!W((xx>>4)-1&15,yy>>4))||((xx&15)>13&&!W((xx>>4)+1&15,yy>>4)))A[i][0]|=128;
-				if(((yy&15)<2&&!W(xx>>4,(yy>>4)-1&15))||((yy&15)>13&&!W(xx>>4,(yy>>4)+1&15)))A[i][0]|=64;
+				if(!((xx&15)<8?W((xx>>4)-1&15,yy>>4):W((xx>>4)+1&15,yy>>4)))A[i][0]|=128;
+				if(!((yy&15)<8?W(xx>>4,(yy>>4)-1&15):W(xx>>4,(yy>>4)+1&15)))A[i][0]|=64;
 				A[i][6]=xx;
 				A[i][7]=yy;
 			}
@@ -454,9 +453,7 @@ int main(int argc,char**argv){
 						fwrite(ws,8,1,lv);
 						fclose(lv);
 					}
-				}
-				else(ks==XK_Escape)return 0;
-				else(ks=='p')*bfp++=0;
+				}else(ks==XK_Escape)return 0;
 			}
 			case(KeyRelease)
 				ks=KEYSYM;
@@ -478,10 +475,7 @@ int main(int argc,char**argv){
 		#endif
 			}
 		}
-		if(t!=team[id]){
-			*bfp++=9;
-			*bfp++=team[id];
-		}
+		if(t!=team[id])*bfp++=9|team[id]<<5;
 		if(xy[id][2]!=mx)xy[id][2]=fcx=fmin(fmax(fcx+(mx-xy[id][2])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
 		if(xy[id][3]!=my)xy[id][3]=fcy=fmin(fmax(fcy+(my-xy[id][3])/hypot(mx-xy[id][2],my-xy[id][3]),0),255);
 		xy[id][0]+=kda;

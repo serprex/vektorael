@@ -94,11 +94,11 @@ int main(int argc,char**argv){
 					switch(r&31){
 					case(6)
 						Wf(xy[2],xy[3]);
-					case(7)case 8:
+					case(7 ... 8)
 						readx(xy,4);
 						writex(i,xy,4);
 					case(9)
-						writech(i,team[i]=readch());
+						writech(i,team[i]=r>>5);
 					case(10)
 						for(int j=0;j<4;j++)
 							if(core[j][0]==i+1)core[j][0]=9;
@@ -108,10 +108,12 @@ int main(int argc,char**argv){
 						core[team[i]-1][2]=xy[1]&240|8;
 						core[team[i]-1][3]=xy[0]>>4|xy[1]&240;
 					case(13)
-						writech(i,r>>5);
-						core[r>>5][0]=9;
-						core[r>>5][1]=core[r>>5][3]<<4|8;
-						core[r>>5][2]=core[r>>5][3]&240|8;
+						for(int j=0;j<4;j++)
+							if(core[j][0]==(r>>5)+1){
+								core[j][0]=9;
+								core[j][1]=core[j][3]<<4|8;
+								core[j][2]=core[j][3]&240|8;
+							}
 					case(14 ... 17)
 						core[(r&31)-14][0]=i+1;
 					}
