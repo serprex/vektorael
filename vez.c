@@ -33,12 +33,10 @@ int main(int argc,char**argv){
 		fputs(SDL_GetError(),stderr);
 		return 1;
 	}
-	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,0,argc>1?atoi(argv[1]):2000)==-1||!(lis=SDLNet_TCP_Open(&ip))){
+	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,0,argc>1?atoi(argv[1]):2000)==-1||!(lis=SDLNet_TCP_Open(&ip))||SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(9),lis)==-1){
 		fputs(SDLNet_GetError(),stderr);
 		return 1;
 	}
-	set=SDLNet_AllocSocketSet(9);
-	SDLNet_TCP_AddSocket(set,lis);
 	#else
 	if((lis=socket(AF_INET,SOCK_STREAM,0))<0){
 		fprintf(stderr,"%d\n",errno);
@@ -46,7 +44,7 @@ int main(int argc,char**argv){
 	}
 	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,&one,1);
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_addr.s_addr=htonl(INADDR_ANY),.sin_port=htons(argc>1?atoi(argv[1]):2000)};
-	if(bind(lis,(struct sockaddr*)&ip,sizeof(ip))<0||listen(lis,8)<0){
+	if(bind(lis,(void*)&ip,sizeof(ip))<0||listen(lis,8)<0){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}

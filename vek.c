@@ -21,8 +21,8 @@ Uint32 tvx,tvy;
 #include "v.h"
 #include "math.h"
 #include <x86intrin.h>
-const uint8_t rgb[8][3]={{255,255,255},{255,0,0},{0,255,0},{0,0,255},{0,255,255},{255,255,0},{255,0,255},{128,128,128}};
-uint8_t core[4][4],team[8],xy[8][4],buff[20/*2*4+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
+const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
+uint8_t core[4][4],team[8],xy[8][4],buff[14/*2+2+5+1+4*/],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,1,2,3,4,0,6,7};
 uint_fast8_t w,id,cbts;
 _Bool mine,mb;
 uint16_t W[16];
@@ -75,21 +75,17 @@ void rplace(){
 void die(){
 	if(rad[id]!=32)return;
 	rad[id]=160;
-	int j=0;
 	for(int i=0;i<4;i++)
 		if(core[i][0]==id+1){
-			j=1;
 			*bfp++=10;
 			*bfp++=i|36;
 			core[i][0]=9;
+			return;
 		}
-	if(!j)*bfp++=11;
+	*bfp++=11;
 }
-#ifdef GLX
-void axit(){close(S);}
-#endif
 void mkwud(){
-	int wi[8];
+	uint_fast8_t wi[8];
 	for(int i=0;i<8;i++)wi[ws[i]]=i<<4;
 	glNewList(hud+1,GL_COMPILE);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -99,13 +95,13 @@ void mkwud(){
 		xyv[i<<1|1]=258+(i&2?14-(i>>1):i>>1);
 	}
 	glDrawArrays(GL_LINE_STRIP,0,11);
-	glCirc(wi[1]|7,265,6);
-	glCirc(wi[1]|7,265,4);
-	glCirc(wi[2]|7,265,5);
-	glCirc(wi[3]|7,265,7);
+	glCirc(wi[1]|8,265,6);
+	glCirc(wi[1]|8,265,4);
+	glCirc(wi[2]|8,265,5);
+	glCirc(wi[3]|8,265,7);
 	glCirc(wi[7]|6,263,4);
 	glCirc(wi[7]|10,267,4);
-	xyv[0]=wi[3]|7;
+	xyv[0]=wi[3]|8;
 	xyv[1]=265;
 	glDrawArrays(GL_POINTS,0,1);
 	glBegin(GL_LINES);
@@ -156,15 +152,13 @@ int main(int argc,char**argv){
 		fputs(SDLNet_GetError(),stderr);
 		return 1;
 	}
-	set=SDLNet_AllocSocketSet(1);
-	SDLNet_TCP_AddSocket(set,S);
+	SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(1),S);
 	#else
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?atoi(argv[2]):2000)};
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
-	atexit(axit);
 	#endif
 	FILE*pr=fopen("pr","rb");
 	if(pr){
@@ -264,11 +258,10 @@ int main(int argc,char**argv){
 				readx(xy[r>>5],4);
 			case(9)//TEAM
 				team[r>>5]=readch();
-			case(10){//TOOK
+			case(10)//TOOK
 				int t=readch();
 				core[t&3][0]=t>>2;
-			}
-			case 11:rad[r>>5]=160;
+			if(t>=36)case 11:rad[r>>5]=160;
 			case(12)//CORE
 				core[team[r>>5]-1][0]=9;
 				core[team[r>>5]-1][1]=xy[r>>5][0]&240|8;
@@ -319,11 +312,10 @@ int main(int argc,char**argv){
 				}
 				glEnd();
 			}
-		for(int i=0;i<4;i++){
+		for(int i=0;i<4;i++)
 			if(core[i][0]){
 				if(core[i][0]!=9){
-					core[i][1]=xy[core[i][0]-1][0];
-					core[i][2]=xy[core[i][0]-1][1];
+					memcpy(core[i]+1,xy[core[i][0]-1],2);
 					if(core[i][0]==id+1&&(core[i][2]&240|core[i][1]>>4)==core[team[id]-1][3]){
 						*bfp++=13;
 						*bfp++=i;
@@ -331,16 +323,20 @@ int main(int argc,char**argv){
 						core[i][1]=core[i][3]<<4|8;
 						core[i][2]=core[i][3]&240|8;
 					}
-				}else(SQR(xy[id][0]-core[i][1])+SQR(xy[id][1]-core[i][2])<64&&(team[id]!=i+1||(core[i][2]&240|core[i][1]>>4)!=core[i][3])){
-					*bfp++=11;
-					*bfp++=i|id+1<<2;
-					core[i][0]=id+1;
+				}else(SQR(xy[id][0]-core[i][1])+SQR(xy[id][1]-core[i][2])<64&&rad[id]==32&&(team[id]!=i+1||(core[i][2]&240|core[i][1]>>4)!=core[i][3])){
+					int j=1;
+					for(int i=0;i<4;i++)
+						if(core[i][0]==id+1)j=0;
+					if(j){
+						*bfp++=10;
+						*bfp++=i|id+1<<2;
+						core[i][0]=id+1;
+					}
 				}
 				glColor3ubv(rgb[i]);
 				glCirc(core[i][1],core[i][2],2);
 				glCirc((core[i][3]&15)<<4|8,core[i][3]&240|8,3);
 			}
-		}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]]);
 			for(int j=0;j<B[i][3];j+=8)glCirc(B[i][1],B[i][2],j);
@@ -397,8 +393,8 @@ int main(int argc,char**argv){
 			ahp++;
 			if(W(xx>>4,yy>>4)){
 				if(A[i][0]&192||A[i][5]++==255)goto killA;
-				if((xx&15)<2||(xx&15)>13)A[i][0]|=128;
-				if((yy&15)<2||(yy&15)>13)A[i][0]|=64;
+				if(((xx&15)<2&&!W((xx>>4)-1&15,yy>>4))||((xx&15)>13&&!W((xx>>4)+1&15,yy>>4)))A[i][0]|=128;
+				if(((yy&15)<2&&!W(xx>>4,(yy>>4)-1&15))||((yy&15)>13&&!W(xx>>4,(yy>>4)+1&15)))A[i][0]|=64;
 				A[i][6]=xx;
 				A[i][7]=yy;
 			}
@@ -532,17 +528,21 @@ int main(int argc,char**argv){
 					Ds++;
 				}
 			case(4)
-				chg[4]=30;
-				A[As][0]=id;
-				memcpy(A[As]+1,xy[id],4);
-				A[As][5]=6;
-				As++;
+				if(memcmp(xy,xy+2,2)){
+					chg[4]=30;
+					A[As][0]=id;
+					memcpy(A[As]+1,xy[id],4);
+					A[As][5]=6;
+					As++;
+				}else bfp--;
 			case(5)
-				chg[5]=30;
-				H[Hs][0]=id;
-				memcpy(H[Hs]+1,xy[id],4);
-				H[Hs][5]=5;
-				Hs++;
+				if(memcmp(xy,xy+2,2)){
+					chg[5]=30;
+					H[Hs][0]=id;
+					memcpy(H[Hs]+1,xy[id],4);
+					H[Hs][5]=5;
+					Hs++;
+				}else bfp--;
 			case(6)
 				chg[6]=15;
 				Wf(xy[id][2],xy[id][3]);
