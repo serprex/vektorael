@@ -1,11 +1,10 @@
 #include "v.h"
-const uint8_t one=1;
 #ifdef SDL
 TCPsocket lis,con[8];
 #else
 int lis,con[8];
 #endif
-uint8_t beif[8][256],core[4][4],team[8];
+uint8_t beif[8][256],core0[4],core[4][3],team[8];
 uint_fast8_t cbts,beln[8];
 uint16_t W[16];
 void writex(int j,const void*p,int len){
@@ -42,6 +41,7 @@ int main(int argc,char**argv){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
+	static const uint8_t one=1;
 	setsockopt(lis,SOL_SOCKET,SO_REUSEADDR,&one,1);
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_addr.s_addr=htonl(INADDR_ANY),.sin_port=htons(argc>1?atoi(argv[1]):2000)};
 	if(bind(lis,(void*)&ip,sizeof(ip))<0||listen(lis,8)<0){
@@ -50,7 +50,7 @@ int main(int argc,char**argv){
 	}
 	#endif
 	for(;;){
-		if(pop(cbts)<8&&any(lis)){
+		if(cbts!=255&&any(lis)){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
 			#ifdef SDL
@@ -63,9 +63,11 @@ int main(int argc,char**argv){
 				buff[0]=nid;
 				buff[1]=cbts|=1<<nid;
 				memcpy(buff+2,W,32);
-				for(int i=0;i<2;i++)buff[34+i]=core[i<<1][0]|core[i<<1|1][0]<<4;
-				for(int i=0;i<4;i++)memcpy(buff+36+i*3,core[i]+1,3);
-				for(int i=0;i<4;i++)buff[48+i]=team[i<<1]|team[i<<1|1]<<4;
+				for(int i=0;i<2;i++)buff[34+i]=core0[i<<1]|core0[i<<1|1]<<4;
+				for(int i=0;i<4;i++){
+					memcpy(buff+36+i*3,core[i],3);
+					buff[48+i]=team[i<<1]|team[i<<1|1]<<4;
+				}
 				ship(buff,52);
 				writech(nid,nid<<5);
 			}
@@ -81,7 +83,10 @@ int main(int argc,char**argv){
 						writech(i,i<<5);
 						team[i]=0;
 						for(int j=0;j<4;j++)
-							if(core[j][0]==i+1)core[j][0]=9;
+							if(core0[j]==i+1){
+								core0[j]=9;
+								break;
+							}
 						#ifdef SDL
 						SDLNet_TCP_DelSocket(set,S);
 						SDLNet_TCP_Close(S);
@@ -101,21 +106,25 @@ int main(int argc,char**argv){
 						writech(i,team[i]=r>>5);
 					case(10)
 						for(int j=0;j<4;j++)
-							if(core[j][0]==i+1)core[j][0]=9;
+							if(core0[j]==i+1){
+								core0[j]=9;
+								break;
+							}
 					case(12)
-						core[team[i]-1][0]=9;
-						core[team[i]-1][1]=xy[0]&240|8;
-						core[team[i]-1][2]=xy[1]&240|8;
-						core[team[i]-1][3]=xy[0]>>4|xy[1]&240;
+						core0[team[i]-1]=9;
+						core[team[i]-1][0]=xy[0]&240|8;
+						core[team[i]-1][1]=xy[1]&240|8;
+						core[team[i]-1][2]=xy[0]>>4|xy[1]&240;
 					case(13)
 						for(int j=0;j<4;j++)
-							if(core[j][0]==(r>>5)+1){
-								core[j][0]=9;
-								core[j][1]=core[j][3]<<4|8;
-								core[j][2]=core[j][3]&240|8;
+							if(core0[j]==(r>>5)+1){
+								core0[j]=9;
+								core[j][0]=core[j][2]<<4|8;
+								core[j][1]=core[j][2]&240|8;
+								break;
 							}
 					case(14 ... 17)
-						core[(r&31)-14][0]=i+1;
+						core0[(r&31)-14]=i+1;
 					}
 				}
 			}
