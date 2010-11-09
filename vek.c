@@ -21,7 +21,7 @@ Uint32 tvx,tvy;
 #include <math.h>
 #include <x86intrin.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[13],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,0,6,7};
+uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[13],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,7,0,6};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb;
@@ -145,7 +145,7 @@ int mkwep(int w,int id){
 		B[Bs][0]=id;
 		memcpy(B[Bs]+1,xy[id]+2,2);
 		B[Bs][3]=0;
-		B[Bs][4]=48;
+		B[Bs][4]=56;
 		Bs++;
 	case(4)
 		if(memcmp(xy,xy+2,2)){
@@ -235,7 +235,6 @@ int main(int argc,char**argv){
 			int r=readch();
 			if(r==-1)return 0;
 			switch(r&31){
-			uint8_t b4[4];
 			case(0)//CBTS
 				cbts^=1<<(r>>5);
 				if(!(cbts&1<<(r>>5))){
@@ -249,11 +248,11 @@ int main(int argc,char**argv){
 			case(1 ... 6)mkwep(r&31,r>>5);
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
-				readx(b4,4);
-				memcpy(B[Bs]+1,b4,2);
-				memcpy(B[Bs+1]+1,b4+2,2);
+				readx(bfp,4);
+				memcpy(B[Bs]+1,bfp,2);
+				memcpy(B[Bs+1]+1,bfp+2,2);
 				B[Bs][3]=B[Bs+1][3]=0;
-				B[Bs][4]=B[Bs+1][4]=32;
+				B[Bs][4]=B[Bs+1][4]=48;
 				Bs+=2;
 			case(8)//MOVE
 				readx(xy[r>>5],4);
@@ -407,13 +406,12 @@ int main(int argc,char**argv){
 				if(EV(motion.y)<256)my=EV(motion.y);
 			case(KeyPress){
 				ks=KEYSYM;
-				FILE*lv;
-				int keq;
 				kda+=(ks=='d')-(ks=='a');
 				ksw+=(ks=='s')-(ks=='w');
 				w=w+(ks=='m')-(ks=='n')&7;
 				mb|=(ks=='b');
-				if(keq=(ks=='e')-(ks=='q')){
+				int keq=(ks=='e')-(ks=='q');
+				if(keq){
 					uint8_t t=ws[w];
 					ws[w]=ws[w+keq&7];
 					ws[w+keq&7]=t;
@@ -422,7 +420,8 @@ int main(int argc,char**argv){
 				}else(ks>='0'&&ks<='4')team[id]=ks-'0';
 				else(ks=='5')k5=1;
 				else(ks==' '){
-					if(lv=fopen("lv","wb")){
+					FILE*lv=fopen("lv","wb");
+					if(lv){
 						fwrite(W,16,2,lv);
 						fclose(lv);
 					}
@@ -457,7 +456,7 @@ int main(int argc,char**argv){
 		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]-=kda;
 		xy[id][1]+=ksw;
 		if(W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]-=ksw;
-		if(!ws[w]&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)&&mb){
+		if(!ws[w]&&mb&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)){
 			chg[0]=255;
 			memcpy(xy[id],xy[id]+2,2);
 		}
@@ -471,7 +470,7 @@ int main(int argc,char**argv){
 			core[team[id]-1][1]=xy[id][1]&240|8;
 			core[team[id]-1][2]=xy[id][0]>>4|xy[id][1]&240;
 		}
-		if(ws[w]&&!chg[ws[w]]&&mb){
+		if(mb&&ws[w]&&!chg[ws[w]]){
 			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id);
 			else(mine=!mine){
 				chg[7]=15;
@@ -479,12 +478,13 @@ int main(int argc,char**argv){
 			}else{
 				chg[7]=180;
 				B[Bs][0]=B[Bs+1][0]=id;
+				*bfp++=7;
 				memcpy(bfp,mixy,4);
+				bfp+=4;
 				memcpy(B[Bs]+1,mixy,2);
 				memcpy(B[Bs+1]+1,mixy+2,2);
-				bfp+=5;
 				B[Bs][3]=B[Bs+1][3]=0;
-				B[Bs][4]=B[Bs+1][4]=32;
+				B[Bs][4]=B[Bs+1][4]=48;
 				Bs+=2;
 			}
 		}
