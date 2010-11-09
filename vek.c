@@ -10,7 +10,6 @@ struct timeval tvx,tvy;
 #include <time.h>
 Uint32 tvx,tvy;
 #define KEYSYM ev.key.keysym.sym
-#define XK_Escape SDLK_ESCAPE
 #define KeyPress SDL_KEYDOWN
 #define KeyRelease SDL_KEYUP
 #define ButtonPress SDL_MOUSEBUTTONDOWN
@@ -22,7 +21,7 @@ Uint32 tvx,tvy;
 #include <math.h>
 #include <x86intrin.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[13],*bfp,B[32][5],Bs,H[80][6],Hs,D[8][5],Ds,A[80][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,0,6,7};
+uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[13],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,0,6,7};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb;
@@ -83,14 +82,14 @@ void die(){
 void mkhud(){
 	uint_fast8_t wi[8];
 	for(int i=0;i<8;i++)wi[ws[i]]=i<<4;
-	for(int i=0;i<14;i++){
+	for(int i=0;i<13;i++){
 		xyv[i<<1]=wi[0]|1+(i+1&2?14-(i+1>>1):i+1>>1);
 		xyv[i<<1|1]=258+(i&2?14-(i>>1):i>>1);
 	}
 	glNewList(hud,GL_COMPILE);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3ubv(rgb[id]);
-	glDrawArrays(GL_LINE_STRIP,0,14);
+	glDrawArrays(GL_LINE_STRIP,0,13);
 	glCirc(wi[1]|8,265,6);
 	glCirc(wi[1]|8,265,4);
 	glCirc(wi[3]|8,265,5);
@@ -117,6 +116,59 @@ void mkhud(){
 				glEnd();
 			}
 	glEndList();
+}
+int mkwep(int w,int id){
+	switch(w){
+	default:__builtin_unreachable();
+	case(1)
+		chg[1]=120;
+		B[Bs][0]=id;
+		memcpy(B[Bs]+1,xy[id],2);
+		B[Bs][3]=0;
+		B[Bs][4]=64;
+		Bs++;
+	case(2)
+		B[Bs][4]=sqrt(SQR(xy[id][0]-xy[id][2])+SQR(xy[id][1]-xy[id][3]));
+		if(B[Bs][4]>xy[id][0])B[Bs][4]=xy[id][0];
+		if(B[Bs][4]>xy[id][1])B[Bs][4]=xy[id][1];
+		if(B[Bs][4]>255-xy[id][0])B[Bs][4]=255-xy[id][0];
+		if(B[Bs][4]>255-xy[id][1])B[Bs][4]=255-xy[id][1];
+		if(B[Bs][4]>16){
+			chg[2]=180;
+			B[Bs][0]=128|id;
+			memcpy(B[Bs]+1,xy[id],2);
+			B[Bs][3]=B[Bs][4]-16;
+			Bs++;
+		}else return 0;
+	case(3)
+		chg[3]=150;
+		B[Bs][0]=id;
+		memcpy(B[Bs]+1,xy[id]+2,2);
+		B[Bs][3]=0;
+		B[Bs][4]=48;
+		Bs++;
+	case(4)
+		if(memcmp(xy,xy+2,2)){
+			chg[4]=30;
+			A[As][0]=id;
+			memcpy(A[As]+1,xy[id],4);
+			A[As][5]=7;
+			As++;
+		}else return 0;
+	case(5)
+		if(memcmp(xy,xy+2,2)){
+			chg[5]=30;
+			A[As][0]=32|id;
+			memcpy(A[As]+1,xy[id],4);
+			A[As][5]=5;
+			As++;
+		}else return 0;
+	case(6)
+		chg[6]=15;
+		Wf(xy[id][2],xy[id][3]);
+		mkhud();
+	}
+	return 1;
 }
 int main(int argc,char**argv){
 	if(argc<2){
@@ -194,41 +246,7 @@ int main(int argc,char**argv){
 							break;
 						}
 				}
-			case(1)//BOMB
-				B[Bs][0]=r>>5;
-				memcpy(B[Bs]+1,xy[r>>5],2);
-				B[Bs][3]=0;
-				B[Bs][4]=64;
-				Bs++;
-			case(2)//DOME
-				D[Ds][3]=sqrt(SQR(xy[r>>5][0]-xy[r>>5][2])+SQR(xy[r>>5][1]-xy[r>>5][3]));
-				if(D[Ds][3]>xy[r>>5][0])D[Ds][3]=xy[r>>5][0];
-				if(D[Ds][3]>xy[r>>5][1])D[Ds][3]=xy[r>>5][1];
-				if(D[Ds][3]>255-xy[r>>5][0])D[Ds][3]=255-xy[r>>5][0];
-				if(D[Ds][3]>255-xy[r>>5][1])D[Ds][3]=255-xy[r>>5][1];
-				D[Ds][0]=r>>5;
-				memcpy(D[Ds]+1,xy[r>>5],2);
-				D[Ds][4]=D[Ds][3]-16;
-				Ds++;
-			case(3)//NUKE
-				B[Bs][0]=r>>5;
-				memcpy(B[Bs]+1,xy[r>>5]+2,2);
-				B[Bs][3]=0;
-				B[Bs][4]=48;
-				Bs++;
-			case(4)//WAVE
-				A[As][0]=r>>5;
-				memcpy(A[As]+1,xy[r>>5],4);
-				A[As][5]=8;
-				As++;
-			case(5)//SHOT
-				H[Hs][0]=r>>5;
-				memcpy(H[Hs]+1,xy[r>>5],4);
-				H[Hs][5]=6;
-				Hs++;
-			case(6)//WALL
-				Wf(xy[r>>5][2],xy[r>>5][3]);
-				mkhud();
+			case(1 ... 6)mkwep(r&31,r>>5);
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
 				readx(b4,4);
@@ -323,61 +341,34 @@ int main(int argc,char**argv){
 				glCirc((core[i][2]&15)<<4|8,core[i][2]&240|8,3);
 			}
 		for(int i=0;i<Bs;){
-			glColor3ubv(rgb[B[i][0]]);
-			for(int j=0;j<B[i][3];j+=8)glCirc(B[i][1],B[i][2],j);
-			glCirc(B[i][1],B[i][2],B[i][3]);
-			if(B[i][3]==B[i][4]&&i<Bs){
+			glColor3ubv(rgb[B[i][0]&127]);
+			int b=B[i][0]&128;
+			for(int j=b?B[i][4]-16:0;j<=B[i][3];j+=b?3:8)glCirc(B[i][1],B[i][2],j);
+			glCirc(B[i][1],B[i][2],B[i][b?4:3]);
+			if(B[i][3]==B[i][4]){
+				if(b&&SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2])<SQR(B[i][4])&&SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2])>SQR(B[i][4]-16))die();
 				memmove(B+i,B+i+1,(Bs-i)*5);
 				Bs--;
 				continue;
 			}
-			if(B[i][3]>8&&SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2])<SQR(B[i][3]))die();
-			B[i][3]++;
-			i++;
-		}
-		for(int i=0;i<Ds;){
-			glColor3ubv(rgb[D[i][0]]);
-			for(int j=D[i][3]-16;j<=D[i][4];j+=3)glCirc(D[i][1],D[i][2],j);
-			glCirc(D[i][1],D[i][2],D[i][3]);
-			D[i][4]+=2;
-			if(D[i][4]==D[i][3]){
-				if(SQR(xy[id][0]-D[i][1])+SQR(xy[id][1]-D[i][2])<SQR(D[i][3])&&SQR(xy[id][0]-D[i][1])+SQR(xy[id][1]-D[i][2])>SQR(D[i][3]-16))die();
-				memmove(D+i,D+i+1,(Hs-i)*5);
-				Ds--;
-				continue;
-			}
+			if(!b&&B[i][3]>8&&SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2])<SQR(B[i][3]))die();
+			B[i][3]+=b?2:1;
 			i++;
 		}
 		uint8_t ahco[160][3];
 		uint_fast16_t ahp=0;
-		for(int i=0;i<Hs;){
-			uint8_t
-				xx=H[i][1]+(H[i][3]-H[i][1])*H[i][5]*2/sqrt(SQR(H[i][3]-H[i][1])+SQR(H[i][4]-H[i][2])),
-				yy=H[i][2]+(H[i][4]-H[i][2])*H[i][5]*2/sqrt(SQR(H[i][3]-H[i][1])+SQR(H[i][4]-H[i][2]));
-			memcpy(ahco[ahp],rgb[H[i][0]],3);
-			xyv[ahp<<1]=xx;
-			xyv[ahp<<1|1]=yy;
-			ahp++;
-			if(W(xx>>4,yy>>4)||H[i][5]++==255){
-				memmove(H+i,H+i+1,(Hs-i)*6);
-				Hs--;
-				continue;
-			}
-			if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
-			i++;
-		}
 		for(int i=0;i<As;){
 			uint8_t
-				xx=A[i][1]+(A[i][3]-A[i][1])*A[i][5]*1.5/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2])),
-				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]*1.5/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2]));
+				xx=A[i][1]+(A[i][3]-A[i][1])*A[i][5]*(A[i][0]&32?2:1.5)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2])),
+				yy=A[i][2]+(A[i][4]-A[i][2])*A[i][5]*(A[i][0]&32?2:1.5)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2]));
 			if(A[i][0]&128)xx=(A[i][6]<<1)-xx;
 			if(A[i][0]&64)yy=(A[i][7]<<1)-yy;
-			memcpy(ahco[ahp],rgb[A[i][0]&63],3);
+			memcpy(ahco[ahp],rgb[A[i][0]&7],3);
 			xyv[ahp<<1]=xx;
 			xyv[ahp<<1|1]=yy;
 			ahp++;
 			if(W(xx>>4,yy>>4)){
-				if(A[i][0]&192||A[i][5]++==255)goto killA;
+				if(A[i][0]&224||A[i][5]++==255)goto killA;
 				if(!((xx&15)<3?W((xx>>4)-1&15,yy>>4):(xx&15)>12?W((xx>>4)+1&15,yy>>4):1))A[i][0]|=128;
 				if(!((yy&15)<3?W(xx>>4,(yy>>4)-1&15):(yy&15)>12?W(xx>>4,(yy>>4)+1&15):1))A[i][0]|=64;
 				A[i][6]=xx;
@@ -420,14 +411,15 @@ int main(int argc,char**argv){
 				int keq;
 				kda+=(ks=='d')-(ks=='a');
 				ksw+=(ks=='s')-(ks=='w');
+				w=w+(ks=='m')-(ks=='n')&7;
+				mb|=(ks=='b');
 				if(keq=(ks=='e')-(ks=='q')){
 					uint8_t t=ws[w];
 					ws[w]=ws[w+keq&7];
 					ws[w+keq&7]=t;
 					w=w+keq&7;
 					mkhud();
-				}
-				if(ks>='0'&&ks<='4')team[id]=ks-'0';
+				}else(ks>='0'&&ks<='4')team[id]=ks-'0';
 				else(ks=='5')k5=1;
 				else(ks==' '){
 					if(lv=fopen("lv","wb")){
@@ -438,12 +430,13 @@ int main(int argc,char**argv){
 						fwrite(ws,8,1,lv);
 						fclose(lv);
 					}
-				}else(ks==XK_Escape)return 0;
+				}
 			}
 			case(KeyRelease)
 				ks=KEYSYM;
 				kda+=(ks=='a')-(ks=='d');
 				ksw+=(ks=='w')-(ks=='s');
+				mb&=(ks!='b');
 			case(ButtonPress)
 				if(EV(button.button)<3)mb=1;
 				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
@@ -479,69 +472,20 @@ int main(int argc,char**argv){
 			core[team[id]-1][2]=xy[id][0]>>4|xy[id][1]&240;
 		}
 		if(ws[w]&&!chg[ws[w]]&&mb){
-			switch(*bfp++=ws[w]){
-			case(1)
-				chg[1]=120;
-				B[Bs][0]=id;
-				memcpy(B[Bs]+1,xy[id],2);
-				B[Bs][3]=0;
-				B[Bs][4]=64;
-				Bs++;
-			case(2)
-				D[Ds][3]=sqrt(SQR(xy[id][0]-xy[id][2])+SQR(xy[id][1]-xy[id][3]));
-				if(D[Ds][3]>xy[id][0])D[Ds][3]=xy[id][0];
-				if(D[Ds][3]>xy[id][1])D[Ds][3]=xy[id][1];
-				if(D[Ds][3]>255-xy[id][0])D[Ds][3]=255-xy[id][0];
-				if(D[Ds][3]>255-xy[id][1])D[Ds][3]=255-xy[id][1];
-				if(D[Ds][3]>16){
-					chg[2]=180;
-					D[Ds][0]=id;
-					memcpy(D[Ds]+1,xy[id],2);
-					D[Ds][4]=D[Ds][3]-16;
-					Ds++;
-				}else bfp--;
-			case(3)
-				chg[3]=150;
-				B[Bs][0]=id;
-				memcpy(B[Bs]+1,xy[id]+2,2);
-				B[Bs][3]=0;
-				B[Bs][4]=48;
-				Bs++;
-			case(4)
-				if(memcmp(xy,xy+2,2)){
-					chg[4]=30;
-					A[As][0]=id;
-					memcpy(A[As]+1,xy[id],4);
-					A[As][5]=7;
-					As++;
-				}else bfp--;
-			case(5)
-				if(memcmp(xy,xy+2,2)){
-					chg[5]=30;
-					H[Hs][0]=id;
-					memcpy(H[Hs]+1,xy[id],4);
-					H[Hs][5]=5;
-					Hs++;
-				}else bfp--;
-			case(6)
-				chg[6]=15;
-				Wf(xy[id][2],xy[id][3]);
-				mkhud();
-			case(7)
-				if(mine=!mine){
-					chg[7]=15;
-					memcpy(bfp,xy[id],4);
-					bfp--;
-				}else{
-					chg[7]=180;
-					B[Bs][0]=B[Bs+1][0]=id;
-					memcpy(B[Bs]+1,bfp,2);
-					memcpy(B[Bs+1]+1,bfp+2,2);
-					bfp+=4;
-					B[Bs][3]=B[Bs+1][3]=0;
-					B[Bs][4]=B[Bs+1][4]=32;
-					Bs+=2;
-				}
+			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id);
+			else(mine=!mine){
+				chg[7]=15;
+				memcpy(mixy,xy[id],4);
+			}else{
+				chg[7]=180;
+				B[Bs][0]=B[Bs+1][0]=id;
+				memcpy(bfp,mixy,4);
+				memcpy(B[Bs]+1,mixy,2);
+				memcpy(B[Bs+1]+1,mixy+2,2);
+				bfp+=5;
+				B[Bs][3]=B[Bs+1][3]=0;
+				B[Bs][4]=B[Bs+1][4]=32;
+				Bs+=2;
 			}
 		}
 		ship(buff,bfp-buff);
