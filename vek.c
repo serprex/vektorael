@@ -21,7 +21,7 @@ Uint32 tvx,tvy;
 #include <math.h>
 #include <x86intrin.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[13],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,7,0,6};
+uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[15],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,1,3,2,7,0,6};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb;
@@ -31,7 +31,7 @@ uint16_t xyv[1520]__attribute__((aligned(16)));
 void glCirc(int x,int y,int r){
 	int r2=r*r,r12=r--*3>>2,xc=0;
 	uint16_t*xyp=xyv;
-#ifdef __SSE2__
+	#ifdef __SSE2__
 	__m128i o1=_mm_set_epi16(r,0,-r,0,r,0,-r,0),o2=_mm_set_epi16(0,r,0,r,0,-r,0,-r);
 	goto skir;
 	do{
@@ -46,7 +46,7 @@ void glCirc(int x,int y,int r){
 		o1=_mm_add_epi16(o1,_mm_set_epi16(0,1,0,1,0,-1,0,-1));
 		o2=_mm_add_epi16(o2,_mm_set_epi16(1,0,-1,0,1,0,-1,0));
 		xyp+=16;
-#else
+	#else
 	goto skir;
 	do{
 		if(xc*xc+r*r>=r2)r--;
@@ -55,7 +55,7 @@ void glCirc(int x,int y,int r){
 			*xyp++=x+(i<4?(i&2?-xc:xc):(i&2?-r:r));
 			*xyp++=y+(i<4?(i&1?-r:r):(i&1?-xc:xc));
 		}
-#endif
+	#endif
 	}while(++xc<=r12);
 	glDrawArrays(GL_POINTS,0,xyp-xyv>>1);
 }
@@ -73,6 +73,7 @@ void die(){
 	if(rad[id]!=64)return;
 	rad[id]=192;
 	*bfp++=10;
+	for(int i=0;i<8;i++)chg[i]=255;
 	for(int i=0;i<4;i++)
 		if(core0[i]==id+1){
 			core0[i]=9;
@@ -117,16 +118,16 @@ void mkhud(){
 			}
 	glEndList();
 }
-int mkwep(int w,int id){
+int mkwep(int w,int id,int c){
 	switch(w){
 	default:__builtin_unreachable();
 	case(1)
-		chg[1]=120;
 		B[Bs][0]=id;
 		memcpy(B[Bs]+1,xy[id],2);
 		B[Bs][3]=0;
 		B[Bs][4]=64;
 		Bs++;
+		if(c)chg[1]=120;
 	case(2)
 		B[Bs][4]=sqrt(SQR(xy[id][0]-xy[id][2])+SQR(xy[id][1]-xy[id][3]));
 		if(B[Bs][4]>xy[id][0])B[Bs][4]=xy[id][0];
@@ -134,39 +135,43 @@ int mkwep(int w,int id){
 		if(B[Bs][4]>255-xy[id][0])B[Bs][4]=255-xy[id][0];
 		if(B[Bs][4]>255-xy[id][1])B[Bs][4]=255-xy[id][1];
 		if(B[Bs][4]>16){
-			chg[2]=180;
 			B[Bs][0]=128|id;
 			memcpy(B[Bs]+1,xy[id],2);
 			B[Bs][3]=B[Bs][4]-16;
 			Bs++;
+			if(c)chg[2]=180;
 		}else return 0;
 	case(3)
-		chg[3]=150;
 		B[Bs][0]=id;
 		memcpy(B[Bs]+1,xy[id]+2,2);
 		B[Bs][3]=0;
 		B[Bs][4]=56;
 		Bs++;
+		if(c)chg[3]=150;
 	case(4)
 		if(memcmp(xy,xy+2,2)){
-			chg[4]=30;
 			A[As][0]=id;
 			memcpy(A[As]+1,xy[id],4);
 			A[As][5]=7;
 			As++;
+			if(c)chg[4]=30;
 		}else return 0;
 	case(5)
 		if(memcmp(xy,xy+2,2)){
-			chg[5]=30;
 			A[As][0]=32|id;
 			memcpy(A[As]+1,xy[id],4);
 			A[As][5]=5;
 			As++;
+			if(c)chg[5]=30;
 		}else return 0;
 	case(6)
-		chg[6]=15;
-		Wf(xy[id][2],xy[id][3]);
-		mkhud();
+		rad[id]=16;
+		if(c)chg[6]=255;
+		for(int i=0;i<4;i++)
+			if(core0[i]==id+1){
+				core0[i]=9;
+				break;
+			}
 	}
 	return 1;
 }
@@ -185,12 +190,24 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(1),S);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
+	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
+	srand(time(0));
 	#else
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?atoi(argv[2]):2000)};
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
 		fprintf(stderr,"%d\n",errno);
 		return 1;
 	}
+	gettimeofday(&tvx,0);
+	srand(tvx.tv_sec);
+	Display*dpy=XOpenDisplay(0);
+	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
+	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,273,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
+	Atom wmdel=XInternAtom(dpy,"WM_DELETE_WINDOW",False);
+	XSetWMProtocols(dpy,win,&wmdel,1);
+	XMapWindow(dpy,win);
+	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	#endif
 	FILE*pr=fopen("pr","rb");
 	if(pr){
@@ -207,21 +224,6 @@ int main(int argc,char**argv){
 		memcpy(core[i],hand+36+i*3,3);
 	}
 	for(int i=0;i<8;i++)team[i]=i&1?hand[48|i>>1]>>4:hand[48|i>>1]&15;
-	#ifdef GLX
-	Display*dpy=XOpenDisplay(0);
-	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,273,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
-	Atom wmdel=XInternAtom(dpy,"WM_DELETE_WINDOW",False);
-	XSetWMProtocols(dpy,win,&wmdel,1);
-	XMapWindow(dpy,win);
-	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
-	gettimeofday(&tvx,0);
-	srand(tvx.tv_sec);
-	#else
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	SDL_Surface*dpy=SDL_SetVideoMode(256,273,0,SDL_OPENGL);
-	srand(time(0));
-	#endif
 	glOrtho(0,255,272,0,1,-1);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(2,GL_SHORT,0,xyv);
@@ -245,7 +247,7 @@ int main(int argc,char**argv){
 							break;
 						}
 				}
-			case(1 ... 6)mkwep(r&31,r>>5);
+			case(1 ... 6)mkwep(r&31,r>>5,0);
 			case(7)//MINE
 				B[Bs][0]=B[Bs+1][0]=r>>5;
 				readx(bfp,4);
@@ -265,6 +267,10 @@ int main(int argc,char**argv){
 						core0[i]=9;
 						break;
 					}
+			case(11)
+				r=readch();
+				Wf(r&15,r>>4);
+				mkhud();
 			case(12)//CORE
 				core0[team[r>>5]-1]=9;
 				core[team[r>>5]-1][0]=xy[r>>5][0]&240|8;
@@ -293,7 +299,7 @@ int main(int argc,char**argv){
 				chg[ws[i]]--;
 				for(int j=0;j<chg[ws[i]]>>4;j++){
 					glVertex2i(i<<4,257+j);
-					glVertex2i(i<<4|15,257+j);
+					glVertex2i(i+1<<4,257+j);
 				}
 				glVertex2i(i<<4,257+(chg[ws[i]]>>4));
 				glVertex2i(i<<4|chg[ws[i]]&15,257+(chg[ws[i]]>>4));
@@ -387,7 +393,7 @@ int main(int argc,char**argv){
 			glDrawArrays(GL_POINTS,0,ahp);
 			glDisableClientState(GL_COLOR_ARRAY);
 		}
-		int k5=0,t=team[id];
+		int k5=0,t=team[id],wall=0;
 		#ifdef GLX
 		glXSwapBuffers(dpy,win);
 		XEvent ev;
@@ -437,8 +443,14 @@ int main(int argc,char**argv){
 				ksw+=(ks=='w')-(ks=='s');
 				mb&=(ks!='b');
 			case(ButtonPress)
-				if(EV(button.button)<3)mb=1;
-				else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
+				if(EV(button.button)<2)mb=1;
+				else(!wall&&EV(button.button)==3){
+					wall=1;
+					*bfp++=11;
+					*bfp++=mx>>4|my&240;
+					Wf(mx>>4,my>>4);
+					mkhud();
+				}else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
 			case(ButtonRelease)
 				if(EV(button.button)<3)mb=0;
 		#ifdef GLX
@@ -471,7 +483,7 @@ int main(int argc,char**argv){
 			core[team[id]-1][2]=xy[id][0]>>4|xy[id][1]&240;
 		}
 		if(mb&&ws[w]&&!chg[ws[w]]){
-			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id);
+			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id,1);
 			else(mine=!mine){
 				chg[7]=15;
 				memcpy(mixy,xy[id],4);

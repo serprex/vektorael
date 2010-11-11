@@ -16,7 +16,7 @@
 #define else(x) else if(x)
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
-#define Wf(x,y) (W[y>>4]^=(1<<(x>>4)))
+#define Wf(x,y) (W[y]^=(1<<(x)))
 #ifdef SDL
 TCPsocket S;
 SDLNet_SocketSet set;
