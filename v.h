@@ -53,11 +53,11 @@ void readx(void*p,int len){
 	}while(len);
 }
 void ship(void*p,int len){
-	while(len){
-		int nw;
-		do nw=write(S,p,len); while(nw<=0);
-		p+=nw;
-		len-=nw;
-	}
+	do{
+		int r;
+		while((r=write(S,p,len))==-1);
+		p+=r;
+		len-=r;
+	}while(len);
 }
 #endif

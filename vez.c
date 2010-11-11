@@ -100,8 +100,7 @@ int main(int argc,char**argv){
 					case(7 ... 8)
 						readx(xy,4);
 						writex(i,xy,4);
-					case(9)
-						writech(i,team[i]=r>>5);
+					case(9)writech(i,team[i]=r>>5);
 					case(10)
 						for(int j=0;j<4;j++)
 							if(core0[j]==i+1){
@@ -124,8 +123,7 @@ int main(int argc,char**argv){
 								core[j][1]=core[j][2]&240|8;
 								break;
 							}
-					case(14 ... 17)
-						core0[(r&31)-14]=i+1;
+					case(14 ... 17)core0[(r&31)-14]=i+1;
 					}
 				}
 			}
