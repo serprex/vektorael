@@ -4,20 +4,25 @@ TCPsocket lis,con[8];
 #else
 int lis,con[8];
 #endif
-uint8_t beif[8][256],core0[4],core[4][3],team[8];
-uint_fast8_t cbts,beln[8];
+uint8_t beif[8][256],core0[4],core[4][3],team[8],beln[8],cbts;
 uint16_t W[16];
 void writex(int j,const void*p,int len){
-	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&i!=j){
-			memcpy(beif[i]+beln[i],p,len);
-			beln[i]+=len;
-		}
+	beln[j]-=len;
+	for(int i=0;i<8;i++){
+		memcpy(beif[i]+beln[i],p,len);
+		beln[i]+=len;
+	}
 }
-void writech(int j,uint8_t c){
+void writech(uint8_t c){
 	for(int i=0;i<8;i++)
-		if(cbts&1<<i&&i!=j)
-			beif[i][beln[i]++]=c;
+		if(con[i]!=S)beif[i][beln[i]++]=c;
+}
+void core9(int i){
+	for(int j=0;j<4;j++)
+		if(core0[j]==i+1){
+			core0[j]=9;
+			break;
+		}
 }
 int main(int argc,char**argv){
 	if(argc>2){
@@ -60,16 +65,16 @@ int main(int argc,char**argv){
 			#endif
 			else{
 				uint8_t buff[52];
-				buff[0]=nid;
-				buff[1]=cbts|=1<<nid;
-				memcpy(buff+2,W,32);
+				memcpy(buff,W,32);
+				buff[32]=nid;
+				buff[33]=cbts^=1<<nid;
 				for(int i=0;i<2;i++)buff[34+i]=core0[i<<1]|core0[i<<1|1]<<4;
 				for(int i=0;i<4;i++){
 					memcpy(buff+36+i*3,core[i],3);
 					buff[48+i]=team[i<<1]|team[i<<1|1]<<4;
 				}
 				ship(buff,52);
-				writech(nid,nid<<5);
+				writech(nid<<5);
 			}
 		}
 		for(int i=0;i<8;i++)
@@ -78,49 +83,40 @@ int main(int argc,char**argv){
 				while(any(S=con[i])){
 					int r=readch();
 					if(r==-1){
-						beln[i]=0;
-						cbts&=~(1<<i);
-						writech(i,i<<5);
-						team[i]=0;
-						for(int j=0;j<4;j++)
-							if(core0[j]==i+1){
-								core0[j]=9;
-								break;
-							}
 						#ifdef SDL
 						SDLNet_TCP_DelSocket(set,S);
 						SDLNet_TCP_Close(S);
 						#else
 						close(S);
 						#endif
+						beln[i]=0;
+						cbts^=1<<i;
+						writech(i<<5);
+						team[i]=0;
+						core9(i);
 						break;
 					}
-					writech(i,r&31|i<<5);
+					writech(r&31|i<<5);
 					switch(r&31){
 					case(7 ... 8)
 						readx(xy,4);
 						writex(i,xy,4);
-					case(9)writech(i,team[i]=r>>5);
-					case(10)
-						for(int j=0;j<4;j++)
-							if(core0[j]==i+1){
-								core0[j]=9;
-								break;
-							}
+					case(9)writech(team[i]=r>>5);
+					case(10)core9(i);
 					case(11)
-						writech(i,r=readch());
+						writech(r=readch());
 						Wf(r&15,r>>4);
 					case(12)
-						core0[team[i]-1]=9;
 						core[team[i]-1][0]=xy[0]&240|8;
 						core[team[i]-1][1]=xy[1]&240|8;
 						core[team[i]-1][2]=xy[0]>>4|xy[1]&240;
+						core0[team[i]-1]=9;
 					case(13)
 						for(int j=0;j<4;j++)
 							if(core0[j]==(r>>5)+1){
-								core0[j]=9;
 								core[j][0]=core[j][2]<<4|8;
 								core[j][1]=core[j][2]&240|8;
+								core0[j]=9;
 								break;
 							}
 					case(14 ... 17)core0[(r&31)-14]=i+1;
@@ -135,12 +131,13 @@ int main(int argc,char**argv){
 				#else
 				void*p=beif[i];
 				while(beln[i]){
-					int nw;
-					while((nw=write(con[i],p,beln[i]))<=0);
-					p+=nw;
-					beln[i]-=nw;
+					int r;
+					while((r=write(con[i],p,beln[i]))==-1);
+					p+=r;
+					beln[i]-=r;
 				}
 				#endif
 			}
+		memset(beln,0,8);
 	}
 }
