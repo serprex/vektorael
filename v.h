@@ -17,6 +17,14 @@
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
 #define Wf(x,y) (W[y]^=(1<<(x)))
+uint8_t flag0[4],flag[4][3],team[8],mode;
+void flag9(int i){
+	for(int j=0;j<4;j++)
+		if(flag0[j]==i+1){
+			flag0[j]=9;
+			break;
+		}
+}
 #ifdef SDL
 TCPsocket S;
 SDLNet_SocketSet set;

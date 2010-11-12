@@ -1,3 +1,4 @@
+#include <math.h>
 #ifdef GLX
 #include <GL/glx.h>
 #include <sys/time.h>
@@ -15,25 +16,18 @@ Uint32 tvx,tvy;
 #define ButtonPress SDL_MOUSEBUTTONDOWN
 #define ButtonRelease SDL_MOUSEBUTTONUP
 #define MotionNotify SDL_MOUSEMOTION
+#define ClientMessage SDL_QUIT
 #define EV(y) ev.y
 #endif
 #include "v.h"
-#include <math.h>
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t core0[4],core[4][3],team[8],xy[8][4],buff[15],mixy[4],*bfp,B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,2,3,1,7,0,6};
+uint8_t*bfp,buff[16],xy[8][4],mixy[4],B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,2,3,1,7,0,6};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb;
 uint16_t W[16],xyv[1520]__attribute__((aligned(16)));
 uint32_t reed;
 GLuint hud;
-void core9(int i){
-	for(int j=0;j<4;j++)
-		if(core0[j]==i+1){
-			core0[j]=9;
-			break;
-		}
-}
 void glCirc(int x,int y,int r){
 	uint16_t*xyp=xyv,r2=r*r,r12=r--*3>>2,rr=-1,xc=0;
 	goto skir;
@@ -50,16 +44,17 @@ void glCirc(int x,int y,int r){
 }
 void rplace(){
 	for(int i=0;i<256;i++){
-		*(uint16_t*)(xy+id)^=reed=(reed^13)>>3|(reed^13)<<29;
+		*(uint16_t*)(xy+id)^=reed=(reed^7)>>3|(reed^7)<<29;
 		if(!W(xy[id][0]>>4,xy[id][1]>>4))break;
 	}
 }
-void die(){
+void die(int i){
 	if(rad[id]!=64)return;
 	rad[id]=192;
 	*bfp++=10;
+	*bfp++=i;
 	memset(chg,255,8);
-	core9(id);
+	flag9(id);
 }
 void mkhud(){
 	uint_fast8_t wi[8];
@@ -122,7 +117,7 @@ int mkwep(int w,int id,int c){
 		}else return 0;
 	case(6)
 		rad[id]=16;
-		core9(id);
+		flag9(id);
 	}
 	return 1;
 }
@@ -153,8 +148,7 @@ int main(int argc,char**argv){
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
 	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,272,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
-	Atom wmdel=XInternAtom(dpy,"WM_DELETE_WINDOW",False);
-	XSetWMProtocols(dpy,win,&wmdel,1);
+	XSetWMProtocols(dpy,win,(Atom[]){XInternAtom(dpy,"WM_DELETE_WINDOW",False)},1);
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
@@ -172,8 +166,8 @@ int main(int argc,char**argv){
 	id=hand[32];
 	cbts=hand[33];
 	for(int i=0;i<4;i++){
-		core0[i]=i&1?hand[34+(i>>1)]>>4:hand[34+(i>>1)]&15;
-		memcpy(core[i],hand+36+i*3,3);
+		flag0[i]=i&1?hand[34+(i>>1)]>>4:hand[34+(i>>1)]&15;
+		memcpy(flag[i],hand+36+i*3,3);
 	}
 	for(int i=0;i<8;i++)team[i]=i&1?hand[48+(i>>1)]>>4:hand[48+(i>>1)]&15;
 	glOrtho(0,255,272,0,1,-1);
@@ -193,7 +187,7 @@ int main(int argc,char**argv){
 				cbts^=1<<(r5);
 				if(!(cbts&1<<r5)){
 					team[r5]=0;
-					core9(r5);
+					flag9(r5);
 				}
 			case(1 ... 6)mkwep(r&31,r5,0);
 			case(7)
@@ -207,25 +201,26 @@ int main(int argc,char**argv){
 			case(9)team[r5]=readch();
 			case(10)
 				rad[r5]=192;
-				core9(r5);
+				flag9(r5);
 			case(11)
 				r=readch();
 				Wf(r&15,r>>4);
 				mkhud();
 			case(12)
-				core0[team[r5]-1]=9;
-				core[team[r5]-1][0]=xy[r5][0]&240|8;
-				core[team[r5]-1][1]=xy[r5][1]&240|8;
-				core[team[r5]-1][2]=xy[r5][0]>>4|xy[r5][1]&240;
+				flag0[team[r5]-1]=9;
+				flag[team[r5]-1][0]=xy[r5][0]&240|8;
+				flag[team[r5]-1][1]=xy[r5][1]&240|8;
+				flag[team[r5]-1][2]=xy[r5][0]>>4|xy[r5][1]&240;
 			case(13)
 				for(int j=0;j<4;j++)
-					if(core0[j]==r5+1){
-						core0[j]=9;
-						core[j][0]=core[j][2]<<4|8;
-						core[j][1]=core[j][2]&240|8;
+					if(flag0[j]==r5+1){
+						flag0[j]=9;
+						flag[j][0]=flag[j][2]<<4|8;
+						flag[j][1]=flag[j][2]&240|8;
 						break;
 					}
-			case(14 ... 17)core0[(r&31)-14]=r5+1;
+			case(14 ... 17)flag0[(r&31)-14]=r5+1;
+			case(18)mode=readch();
 			}
 		}
 		glCallList(hud);
@@ -260,36 +255,36 @@ int main(int argc,char**argv){
 				}
 			}
 		for(int i=0;i<4;i++)
-			if(core0[i]){
-				if(core0[i]!=9){
-					memcpy(core[i],xy[core0[i]-1],2);
-					if(core0[i]==id+1&&(core[i][1]&240|core[i][0]>>4)==core[team[id]-1][2]){
+			if(flag0[i]){
+				if(flag0[i]!=9){
+					memcpy(flag[i],xy[flag0[i]-1],2);
+					if(flag0[i]==id+1&&(flag[i][1]&240|flag[i][0]>>4)==flag[team[id]-1][2]){
 						*bfp++=13;
-						core0[i]=9;
-						core[i][0]=core[i][2]<<4|8;
-						core[i][1]=core[i][2]&240|8;
+						flag0[i]=9;
+						flag[i][0]=flag[i][2]<<4|8;
+						flag[i][1]=flag[i][2]&240|8;
 					}
-				}else(SQR(xy[id][0]-core[i][0])+SQR(xy[id][1]-core[i][1])<64&&rad[id]==64&&(team[id]!=i+1||(core[i][1]&240|core[i][0]>>4)!=core[i][2])){
+				}else(SQR(xy[id][0]-flag[i][0])+SQR(xy[id][1]-flag[i][1])<64&&rad[id]==64&&(team[id]!=i+1||(flag[i][1]&240|flag[i][0]>>4)!=flag[i][2])){
 					for(int i=0;i<4;i++)
-						if(core0[i]==id+1)goto noj;
+						if(flag0[i]==id+1)goto noj;
 					*bfp++=14+i;
-					core0[i]=id+1;
+					flag0[i]=id+1;
 				}
 				noj:glColor3ubv(rgb[i]);
-				glCirc(core[i][0],core[i][1],2);
-				glCirc((core[i][2]&15)<<4|8,core[i][2]&240|8,3);
+				glCirc(flag[i][0],flag[i][1],2);
+				glCirc((flag[i][2]&15)<<4|8,flag[i][2]&240|8,3);
 			}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]&127]);
-			int b=B[i][0]&128,sqr=SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2]);
+			int b=B[i][0]&128,q=SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2]);
 			for(int j=b?B[i][4]-16:0;j<=B[i][3];j+=b?3:8)glCirc(B[i][1],B[i][2],j);
 			glCirc(B[i][1],B[i][2],B[i][b?4:3]);
 			if(B[i][3]==B[i][4]){
-				if(b&&sqr<SQR(B[i][4])&&sqr>SQR(B[i][4]-16))die();
+				if(b&&q<SQR(B[i][4])&&q>SQR(B[i][4]-16))die(B[i][0]);
 				memmove(B+i,B+i+1,(Bs-i)*5);
 				Bs--;
 				continue;
-			}else(!b&&B[i][3]&&sqr<SQR(B[i][3]))die();
+			}else(!b&&B[i][3]&&q<SQR(B[i][3]))die(B[i][0]);
 			B[i][3]+=b?2:1;
 			i++;
 		}
@@ -315,7 +310,7 @@ int main(int argc,char**argv){
 					As--;
 					continue;
 				}
-				if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die();
+				if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die(A[i][0]);
 				i++;
 			}
 			glEnableClientState(GL_COLOR_ARRAY);
@@ -374,12 +369,7 @@ int main(int argc,char**argv){
 					Wf(mx>>4,my>>4);
 					mkhud();
 				}else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
-		#ifdef GLX
-			case(ClientMessage)
-				if(ev.xclient.data.l[0]==wmdel)return 0;
-		#else
-			case(SDL_QUIT)return 0;
-		#endif
+			case(ClientMessage)return 0;
 			}
 		}
 		if(t!=team[id])*bfp++=9|team[id]<<5;
@@ -394,12 +384,12 @@ int main(int argc,char**argv){
 		*bfp++=8;
 		memcpy(bfp,xy+id,4);
 		bfp+=4;
-		if(k5&&team[id]&&(!core0[team[id]-1]||(core[team[id]-1][1]&240|core[team[id]-1][0]>>4)!=core[team[id]-1][2])){
+		if(k5&&team[id]&&(!flag0[team[id]-1]||(flag[team[id]-1][1]&240|flag[team[id]-1][0]>>4)!=flag[team[id]-1][2])){
 			*bfp++=12;
-			core0[team[id]-1]=9;
-			core[team[id]-1][0]=xy[id][0]&240|8;
-			core[team[id]-1][1]=xy[id][1]&240|8;
-			core[team[id]-1][2]=xy[id][0]>>4|xy[id][1]&240;
+			flag0[team[id]-1]=9;
+			flag[team[id]-1][0]=xy[id][0]&240|8;
+			flag[team[id]-1][1]=xy[id][1]&240|8;
+			flag[team[id]-1][2]=xy[id][0]>>4|xy[id][1]&240;
 		}
 		if(mb&&ws[w]&&!chg[ws[w]]){
 			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id,1);
@@ -424,7 +414,6 @@ int main(int argc,char**argv){
 		gettimeofday(&tvy,0);
 		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<30000)usleep(33000-(tvy.tv_usec-tvx.tv_usec));
 		gettimeofday(&tvx,0);
-		reed+=tvx.tv_usec;
 		#else
 		tvy=SDL_GetTicks();
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
