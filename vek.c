@@ -21,10 +21,10 @@ Uint32 tvx,tvy;
 #endif
 #include "v.h"
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t*bfp,buff[16],xy[8][4],mixy[4],B[40][5],Bs,A[160][8],As,chg[8],rad[8],ws[8]={5,4,2,3,1,7,0,6};
+uint8_t*bfp,buff[16],xy[8][4],mixy[4],B[40][5],Bs,A[160][8],As,chg[8],rad[8],win[8],ws[8]={5,4,2,3,1,7,0,6};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
-_Bool mine,mb;
+_Bool mine,mb,sbo;
 uint16_t W[16],xyv[1520]__attribute__((aligned(16)));
 GLuint hud;
 void glCirc(int x,int y,int r){
@@ -64,7 +64,7 @@ void mkhud(){
 	xyv[0]=wi[1]|8;
 	xyv[1]=265;
 	glDrawArrays(GL_POINTS,0,1);
-	for(int i=0;i<3;i++)glCirc(wi[i&1?1:7]|6+(i<<1),263+(i<<1),i&1?7:4);
+	for(int i=6;i<12;i+=2)glCirc(wi[i&2?7:1]|i,257+i,i&2?4:7);
 	glBegin(GL_LINES);
 	for(int i=0;i<2;i++)glVertex2i(i<<8,256);
 	static const uint8_t ppack[]={1,2,8,9,14,15},pack[]={17,19,72,104,77,80,80,101,128,173,192,236,232,197};
@@ -139,10 +139,10 @@ int main(int argc,char**argv){
 	}
 	Display*dpy=XOpenDisplay(0);
 	XVisualInfo*vi=glXChooseVisual(dpy,DefaultScreen(dpy),(int[]){GLX_RGBA,GLX_DOUBLEBUFFER,None});
-	Window win=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,272,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
-	XSetWMProtocols(dpy,win,(Atom[]){XInternAtom(dpy,"WM_DELETE_WINDOW",False)},1);
-	XMapWindow(dpy,win);
-	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
+	Window Wdo=XCreateWindow(dpy,RootWindow(dpy,vi->screen),0,0,256,272,0,vi->depth,InputOutput,vi->visual,CWColormap|CWEventMask,(XSetWindowAttributes[]){{.colormap=XCreateColormap(dpy,RootWindow(dpy,vi->screen),vi->visual,AllocNone),.event_mask=PointerMotionMask|KeyPressMask|KeyReleaseMask|ButtonPressMask|ButtonReleaseMask}});
+	XSetWMProtocols(dpy,Wdo,(Atom[]){XInternAtom(dpy,"WM_DELETE_WINDOW",False)},1);
+	XMapWindow(dpy,Wdo);
+	glXMakeCurrent(dpy,Wdo,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
 	#endif
 	FILE*pr=fopen("pr","rb");
@@ -172,11 +172,13 @@ int main(int argc,char**argv){
 		while(any(S)){
 			int r=readch(),r5=r>>5;
 			if(r==-1)return 0;
+			if((r&31)!=8)fprintf(stderr,"%d:%d ",r&31,r5);
 			switch(r&31){
 			case(0)
 				cbts^=1<<(r5);
 				if(!(cbts&1<<r5)){
 					team[r5]=0;
+					win[r5]=0;
 					flag9(r5);
 				}
 			case(1 ... 6)mkwep(r&31,r5,0);
@@ -211,11 +213,30 @@ int main(int argc,char**argv){
 					}
 			case(14 ... 17)flag0[(r&31)-14]=r5+1;
 			case(18)mode=readch();
+			case(19)
+				r=readch();
+				tar[r&15]=r>>4;
+			case(20)
+				memset(tar,0,8);
+			case(21)
+				if(r5)win[r5-1]++;
+				else{
+					r=readch();
+					for(int i=0;i<8;i++)
+						if(r&1<<i)win[i]++;
+				}
+			case(22)vir=r5;
 			}
 		}
 		glCallList(hud);
 		glBegin(GL_LINES);
 		for(int i=0;i<4;i++)glVertex2i(w+(i>>1)<<4,i+1&2?272:256);
+		if(sbo)
+			cbts(i)
+				if(tar[i]){
+					glVertex2i(xy[i][2],xy[i][3]);
+					glVertex2i(xy[tar[i]-1][0],xy[tar[i]-1][1]);
+				}
 		for(int i=0;i<8;i++)
 			if(chg[ws[i]]){
 				chg[ws[i]]--;
@@ -224,33 +245,32 @@ int main(int argc,char**argv){
 				for(int j=0;j<2;j++)glVertex2i(i<<4|(j?chg[ws[i]]&15:0),257+(chg[ws[i]]>>4));
 			}
 		glEnd();
-		for(int i=0;i<8;i++)
-			if(cbts&1<<i){
-				glColor3ubv(rgb[i]);
-				glCirc(xy[i][0],xy[i][1],(rad[i]&127)>>4);
-				glBegin(GL_POINTS);
-				glVertex2i(xy[i][2],xy[i][3]);
-				if(team[i]){
-					glColor3ubv(rgb[team[i]-1]);
-					glVertex2i(xy[i][0],xy[i][1]);
-				}
-				glEnd();
-				if(rad[i]!=64){
-					if(rad[i]&128){
-						if(--rad[i]==144){
-							rad[i]=16;
-							if(i==id){
-								#ifdef SDL
-								time_t t=time(0)^tvx<<4;
-								*(uint16_t*)(xy+id)^=SQR(t)^t;
-								#else
-								*(uint16_t*)(xy+id)^=tvx.tv_usec;
-								#endif
-							}
-						}
-					}else rad[i]++;
-				}
+		cbts(i){
+			glColor3ubv(rgb[i]);
+			glCirc(xy[i][0],xy[i][1],(rad[i]&127)>>4);
+			glBegin(GL_POINTS);
+			glVertex2i(xy[i][2],xy[i][3]);
+			if(team[i]){
+				glColor3ubv(rgb[team[i]-1]);
+				glVertex2i(xy[i][0],xy[i][1]);
 			}
+			glEnd();
+			if(rad[i]!=64){
+				if(rad[i]&128){
+					if(--rad[i]==144){
+						rad[i]=16;
+						if(i==id){
+							#ifdef SDL
+							time_t t=time(0)^tvx<<4;
+							*(uint16_t*)(xy+id)^=SQR(t)^t;
+							#else
+							*(uint16_t*)(xy+id)^=tvx.tv_usec;
+							#endif
+						}
+					}
+				}else rad[i]++;
+			}
+		}
 		for(int i=0;i<4;i++)
 			if(flag0[i]){
 				if(flag0[i]!=9){
@@ -316,7 +336,7 @@ int main(int argc,char**argv){
 		}
 		int k5=0,t=team[id],wall=0;
 		#ifdef GLX
-		glXSwapBuffers(dpy,win);
+		glXSwapBuffers(dpy,Wdo);
 		XEvent ev;
 		while(XPending(dpy)){
 			KeySym ks;
@@ -335,10 +355,11 @@ int main(int argc,char**argv){
 				ks=KEYSYM;
 				kda+=((ks=='d')-(ks=='a'))*(ev.type==KeyPress?:-1);
 				ksw+=((ks=='s')-(ks=='w'))*(ev.type==KeyPress?:-1);
-				if(ev.type==KeyPress)w=w+(ks=='m')-(ks=='n')&7;
 				int keq;
 				if(ks=='b')mb=ev.type==KeyPress;
 				else(ev.type==KeyRelease)break;
+				else(ks=='p')sbo^=1;
+				else(keq=(ks=='m')-(ks=='n'))w=w+keq&7;
 				else(keq=(ks=='e')-(ks=='q')){
 					uint8_t t=ws[w];
 					ws[w]=ws[w+keq&7];

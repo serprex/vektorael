@@ -17,7 +17,8 @@
 #define SQR(x) ((x)*(x))
 #define W(x,y) (W[y]&(1<<(x)))
 #define Wf(x,y) (W[y]^=(1<<(x)))
-uint8_t flag0[4],flag[4][3],team[8],mode;
+#define cbts(x) for(int x=0;x<8;x++)if(cbts&1<<x)
+uint8_t flag0[4],flag[4][3],team[8],tar[8],mode,vir;
 void flag9(int i){
 	for(int j=0;j<4;j++)
 		if(flag0[j]==i+1){
