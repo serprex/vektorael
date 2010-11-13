@@ -26,7 +26,6 @@ uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb;
 uint16_t W[16],xyv[1520]__attribute__((aligned(16)));
-uint32_t reed;
 GLuint hud;
 void glCirc(int x,int y,int r){
 	uint16_t*xyp=xyv,r2=r*r,r12=r--*3>>2,rr=-1,xc=0;
@@ -41,12 +40,6 @@ void glCirc(int x,int y,int r){
 		r2-=rr+=2;
 	}while(++xc<=r12);
 	glDrawArrays(GL_POINTS,0,xyp-xyv>>1);
-}
-void rplace(){
-	for(int i=0;i<256;i++){
-		*(uint16_t*)(xy+id)^=reed=(reed^7)>>3|(reed^7)<<29;
-		if(!W(xy[id][0]>>4,xy[id][1]>>4))break;
-	}
 }
 void die(int i){
 	if(rad[id]!=64)return;
@@ -138,7 +131,6 @@ int main(int argc,char**argv){
 	SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(1),S);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
 	SDL_Surface*dpy=SDL_SetVideoMode(256,272,0,SDL_OPENGL);
-	reed=time(0)^time(0)<<4^time(0)<<12;
 	#else
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?atoi(argv[2]):2000)};
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
@@ -152,7 +144,6 @@ int main(int argc,char**argv){
 	XMapWindow(dpy,win);
 	glXMakeCurrent(dpy,win,glXCreateContext(dpy,vi,0,GL_TRUE));
 	gettimeofday(&tvx,0);
-	reed=tvx.tv_usec;
 	#endif
 	FILE*pr=fopen("pr","rb");
 	if(pr){
@@ -163,7 +154,7 @@ int main(int argc,char**argv){
 	uint8_t*hand=(uint8_t*)xyv;
 	readx(hand,52);
 	memcpy(W,hand,32);
-	id=hand[32];
+	rad[id=hand[32]]=145;
 	cbts=hand[33];
 	for(int i=0;i<4;i++){
 		flag0[i]=i&1?hand[34+(i>>1)]>>4:hand[34+(i>>1)]&15;
@@ -175,8 +166,7 @@ int main(int argc,char**argv){
 	glVertexPointer(2,GL_SHORT,0,xyv);
 	hud=glGenLists(1);
 	mkhud();
-	rplace();
-	float fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
+	double fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	for(;;){
 		bfp=buff;
 		while(any(S)){
@@ -249,7 +239,14 @@ int main(int argc,char**argv){
 					if(rad[i]&128){
 						if(--rad[i]==144){
 							rad[i]=16;
-							if(i==id)rplace();
+							if(i==id){
+								#ifdef SDL
+								time_t t=time(0)^tvx<<4;
+								*(uint16_t*)(xy+id)^=SQR(t)^t;
+								#else
+								*(uint16_t*)(xy+id)^=tvx.tv_usec;
+								#endif
+							}
 						}
 					}else rad[i]++;
 				}
@@ -299,18 +296,17 @@ int main(int argc,char**argv){
 				memcpy(ahco[i],rgb[A[i][0]&7],3);
 				xyv[i*2]=xx;
 				xyv[i*2+1]=yy;
-				if(W(xx>>4,yy>>4)){
-					if(A[i][0]&224||A[i][5]++==255)goto killA;
-					if(!((xx&15)<3?W((xx>>4)-1&15,yy>>4):(xx&15)>12?W((xx>>4)+1&15,yy>>4):1))A[i][0]|=128;
-					if(!((yy&15)<3?W(xx>>4,(yy>>4)-1&15):(yy&15)>12?W(xx>>4,(yy>>4)+1&15):1))A[i][0]|=64;
-					memcpy(A[i]+6,xyv+i*2,2);
-				}
 				if(A[i][5]++==255){killA:
 					memmove(A+i,A+i+1,(As-i)*8);
 					As--;
 					continue;
-				}
-				if(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die(A[i][0]);
+				}else(W(xx>>4,yy>>4)){
+					if(A[i][0]&224||A[i][5]++==255)goto killA;
+					if(!((xx&15)<3?W((xx>>4)-1&15,yy>>4):(xx&15)>12?W((xx>>4)+1&15,yy>>4):1))A[i][0]|=128;
+					if(!((yy&15)<3?W(xx>>4,(yy>>4)-1&15):(yy&15)>12?W(xx>>4,(yy>>4)+1&15):1))A[i][0]|=64;
+					A[i][6]=xx;
+					A[i][7]=yy;
+				}else(SQR(xy[id][0]-xx)+SQR(xy[id][1]-yy)<64)die(A[i][0]);
 				i++;
 			}
 			glEnableClientState(GL_COLOR_ARRAY);
@@ -375,8 +371,8 @@ int main(int argc,char**argv){
 		if(t!=team[id])*bfp++=9|team[id]<<5;
 		if(xy[id][2]!=mx)xy[id][2]=fcx+=(mx-xy[id][2])/sqrt(SQR(mx-xy[id][2])+SQR(my-xy[id][3]));
 		if(xy[id][3]!=my)xy[id][3]=fcy+=(my-xy[id][3])/sqrt(SQR(mx-xy[id][2])+SQR(my-xy[id][3]));
-		if(!W(xy[id][0]+kda>>4,xy[id][1]>>4))xy[id][0]+=kda;
-		if(!W(xy[id][0]>>4,xy[id][1]+ksw>>4))xy[id][1]+=ksw;
+		if(!W(xy[id][0]+kda>>4,xy[id][1]>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]+=kda;
+		if(!W(xy[id][0]>>4,xy[id][1]+ksw>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]+=ksw;
 		if(!ws[w]&&mb&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)){
 			chg[0]=255;
 			memcpy(xy[id],xy[id]+2,2);
@@ -417,7 +413,7 @@ int main(int argc,char**argv){
 		#else
 		tvy=SDL_GetTicks();
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
-		reed+=tvx=SDL_GetTicks();
+		tvx=SDL_GetTicks();
 		#endif
 	}
 }
