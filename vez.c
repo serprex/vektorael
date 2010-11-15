@@ -206,7 +206,6 @@ int main(int argc,char**argv){
 					kill(i);
 					break;
 				}
-				if((r&31)!=8)fprintf(stderr,"%d:%d ",r&31,i);
 				writech(r&31|i<<5);
 				switch(r&31){
 				case(7 ... 8)

@@ -67,7 +67,7 @@ void mkhud(){
 	for(int i=6;i<12;i+=2)glCirc(wi[i&2?7:1]|i,257+i,i&2?4:7);
 	glBegin(GL_LINES);
 	for(int i=0;i<2;i++)glVertex2i(i<<8,256);
-	static const uint8_t ppack[]={1,2,8,9,14,15},pack[]={17,19,72,104,77,80,80,101,128,173,192,236,232,197};
+	static const uint8_t ppack[]={1,2,8,9,14,15},pack[]={25,27,72,104,77,80,80,101,128,173,192,236,232,197};
 	for(int i=0;i<sizeof(pack);i++)glVertex2i(wi[3+(pack[i]>>6)]|ppack[pack[i]>>3&7],256|ppack[pack[i]&7]);
 	glEnd();
 	for(int i=0;i<16;i++)
@@ -99,7 +99,7 @@ int mkwep(int w,int id,int c){
 		B[Bs][0]=id;
 		memcpy(B[Bs]+1,xy[id]+(w-2<<1),2);
 		B[Bs][3]=0;
-		B[Bs][4]=40+(w<<3);
+		B[Bs][4]=w==2?64:48;
 		Bs++;
 	case(4)case 5:
 		if(*(uint16_t*)xy[id]!=*(uint16_t*)(xy[id]+2)){
@@ -161,7 +161,7 @@ int main(int argc,char**argv){
 		memcpy(flag[i],hand+36+i*3,3);
 	}
 	for(int i=0;i<8;i++)team[i]=i&1?hand[48+(i>>1)]>>4:hand[48+(i>>1)]&15;
-	glOrtho(0,255,272,0,1,-1);
+	glOrtho(0,256,272,0,1,-1);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(2,GL_SHORT,0,xyv);
 	hud=glGenLists(1);
@@ -172,7 +172,6 @@ int main(int argc,char**argv){
 		while(any(S)){
 			int r=readch(),r5=r>>5;
 			if(r==-1)return 0;
-			if((r&31)!=8)fprintf(stderr,"%d:%d ",r&31,r5);
 			switch(r&31){
 			case(0)
 				cbts^=1<<(r5);
@@ -187,7 +186,7 @@ int main(int argc,char**argv){
 				readx(bfp,4);
 				memcpy(B[Bs]+1,bfp,2);
 				memcpy(B[Bs+1]+1,bfp+2,2);
-				*(uint16_t*)(B[Bs]+3)=*(uint16_t*)(B[Bs+1]+3)=0x3000;
+				*(uint16_t*)(B[Bs]+3)=*(uint16_t*)(B[Bs+1]+3)=0x2000;
 				Bs+=2;
 			case(8)readx(xy[r5],4);
 			case(9)team[r5]=readch();
@@ -293,15 +292,14 @@ int main(int argc,char**argv){
 			}
 		for(int i=0;i<Bs;){
 			glColor3ubv(rgb[B[i][0]&127]);
-			int b=B[i][0]&128,q=SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2]);
+			int b=(B[i][0]&128)==128,q=SQR(xy[id][0]-B[i][1])+SQR(xy[id][1]-B[i][2]);
 			for(int j=b?B[i][4]-16:0;j<=B[i][3];j+=b?3:8)glCirc(B[i][1],B[i][2],j);
 			glCirc(B[i][1],B[i][2],B[i][b?4:3]);
 			if(B[i][3]==B[i][4]){
-				if(b&&q<SQR(B[i][4])&&q>SQR(B[i][4]-16))die(B[i][0]);
 				memmove(B+i,B+i+1,(Bs-i)*5);
 				Bs--;
 				continue;
-			}else(!b&&B[i][3]&&q<SQR(B[i][3]))die(B[i][0]);
+			}else(q<SQR(B[i][4])&&(b^(q<SQR(B[i][3]))))die(B[i][0]);
 			B[i][3]+=b?2:1;
 			i++;
 		}
@@ -335,6 +333,65 @@ int main(int argc,char**argv){
 			glDisableClientState(GL_COLOR_ARRAY);
 		}
 		int k5=0,t=team[id],wall=0;
+		#ifdef AI
+		uint_fast8_t wi[8];
+		for(int i=0;i<8;i++)wi[ws[i]]=i;
+		int mnv=130000,mni=id;
+		mb=1;
+		cbts(i)
+			if(i!=id){
+				int ln=SQR(xy[i][0]-xy[id][2])+SQR(xy[i][1]-xy[id][3]);
+				if(ln<mnv){
+					mnv=ln;
+					mni=i;
+				}
+			}
+		if(!chg[2]&&SQR(xy[mni][0]-xy[id][0])+SQR(xy[mni][1]-xy[id][1])<3000)w=wi[2];
+		else(!chg[3]&&mnv<4096)w=wi[3];
+		else(!chg[5])w=wi[5];
+		else(!chg[4])w=wi[4];
+		else(!chg[1])w=wi[1];
+		else(!chg[7]){
+			w=wi[7];
+			if(mine){
+				int mnv=1024;
+				cbts(i)
+					if(i!=id){
+						int ln=SQR(xy[i][0]-mixy[0])+SQR(xy[i][1]-mixy[1]);
+						if(ln<mnv)mnv=ln;
+						ln=SQR(xy[i][0]-mixy[2])+SQR(xy[i][1]-mixy[3]);
+						if(ln<mnv)mnv=ln;
+					}
+				if(mnv==1024)mb=0;
+			}
+		}else(!chg[6])w=wi[6];
+		double mv[4]={};
+		#define REALDIS(x) (abs(x)<255-abs(x)?abs(x):255-abs(x))
+		#define REALCMP(x,y) (abs(x-y)<255-abs(x-y)?x>y:x<y)
+		for(int i=0;i<As;i++){
+			for(int j=A[i][5];j<A[i][5]+5;j++){
+				uint8_t
+					xx=A[i][1]+(A[i][3]-A[i][1])*(A[i][0]&32?j<<1:j*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2])),
+					yy=A[i][2]+(A[i][4]-A[i][2])*(A[i][0]&32?j<<1:j*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2]));
+				double d=.2/(SQR(REALDIS(xx-xy[id][0]))+SQR(REALDIS(yy-xy[id][1])));
+				mv[REALCMP(xx,xy[id][0])]+=d;
+				mv[2+REALCMP(yy,xy[id][1])]+=d;
+			}
+		}
+		for(int i=0;i<Bs;i++)
+			if(!(B[i][0]&128)){
+				int di=SQR(REALDIS(B[i][1]-xy[id][0]))+SQR(REALDIS(B[i][2]-xy[id][1]));
+				if(di<SQR(B[i][4]+3)){
+					double d=B[i][3]/sqrt(di);
+					mv[REALCMP(B[i][1],xy[id][0])]+=d;
+					mv[2+REALCMP(B[i][2],xy[id][1])]+=d;
+				}
+			}
+		kda=mv[0]==mv[1]?0:mv[0]>mv[1]?1:-1;
+		ksw=mv[2]==mv[3]?0:mv[2]>mv[3]?1:-1;
+		mx=xy[mni][0];
+		my=xy[mni][1];
+		#endif
 		#ifdef GLX
 		glXSwapBuffers(dpy,Wdo);
 		XEvent ev;
@@ -348,6 +405,7 @@ int main(int argc,char**argv){
 			SDLKey ks;
 		#endif
 			switch(ev.type){
+			#ifndef AI
 			case(MotionNotify)
 				mx=EV(motion.x);
 				if(EV(motion.y)<256)my=EV(motion.y);
@@ -386,14 +444,15 @@ int main(int argc,char**argv){
 					Wf(mx>>4,my>>4);
 					mkhud();
 				}else w=w+(EV(button.button)==4)-(EV(button.button)==5)&7;
+			#endif
 			case(ClientMessage)return 0;
 			}
 		}
 		if(t!=team[id])*bfp++=9|team[id]<<5;
 		if(xy[id][2]!=mx)xy[id][2]=fcx+=(mx-xy[id][2])/sqrt(SQR(mx-xy[id][2])+SQR(my-xy[id][3]));
 		if(xy[id][3]!=my)xy[id][3]=fcy+=(my-xy[id][3])/sqrt(SQR(mx-xy[id][2])+SQR(my-xy[id][3]));
-		if(!W(xy[id][0]+kda>>4,xy[id][1]>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]+=kda;
-		if(!W(xy[id][0]>>4,xy[id][1]+ksw>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]+=ksw;
+		if(!W((xy[id][0]+kda&255)>>4,xy[id][1]>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][0]+=kda;
+		if(!W(xy[id][0]>>4,(xy[id][1]+ksw&255)>>4)||W(xy[id][0]>>4,xy[id][1]>>4))xy[id][1]+=ksw;
 		if(!ws[w]&&mb&&!chg[0]&&!W(xy[id][2]>>4,xy[id][3]>>4)){
 			chg[0]=255;
 			memcpy(xy[id],xy[id]+2,2);
@@ -421,8 +480,7 @@ int main(int argc,char**argv){
 				bfp+=4;
 				memcpy(B[Bs]+1,mixy,2);
 				memcpy(B[Bs+1]+1,mixy+2,2);
-				B[Bs][3]=B[Bs+1][3]=0;
-				B[Bs][4]=B[Bs+1][4]=48;
+				*(uint16_t*)(B[Bs]+3)=*(uint16_t*)(B[Bs+1]+3)=0x2000;
 				Bs+=2;
 			}
 		}

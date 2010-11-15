@@ -7,5 +7,6 @@ CFLAGS=-DSDL `sdl-config --cflags` `sdl-config --libs` -lSDL_net
 endif
 vek:vek.c v.h
 	${CC} vektorael vek.c ${CFLAGS} -lGL
+	${CC} vekairael vek.c -DAI ${CFLAGS} -lGL
 vez:vez.c v.h
 	${CC} veziovaer vez.c ${CFLAGS}
