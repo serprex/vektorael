@@ -21,7 +21,7 @@ Uint32 tvx,tvy;
 #endif
 #include "v.h"
 const uint8_t rgb[8][3]={{255,255,255},{255,64,64},{64,255,64},{0,255,255},{255,0,255},{255,255,0},{64,64,255},{112,112,112}};
-uint8_t*bfp,buff[16],xy[8][4],mixy[4],B[40][5],Bs,A[160][8],As,chg[8],rad[8],win[8],ws[8]={5,4,2,3,1,7,0,6};
+uint8_t*bfp,buff[16],xy[8][4],B[40][5],Bs,A[160][8],As,chg[8],rad[8],win[8],ws[8]={5,4,2,3,1,7,0,6};
 uint_fast8_t w,id,cbts,mx,my;
 int_fast8_t kda,ksw;
 _Bool mine,mb,sbo;
@@ -44,8 +44,7 @@ void glCirc(int x,int y,int r){
 void die(int i){
 	if(rad[id]!=64)return;
 	rad[id]=192;
-	*bfp++=10;
-	*bfp++=i;
+	*bfp++=10|i<<5;
 	memset(chg,255,8);
 	flag9(id);
 }
@@ -73,9 +72,8 @@ void mkhud(){
 	for(int i=0;i<16;i++)
 		for(int j=0;j<16;j++)
 			if(W(i,j)){
-				glBegin(GL_LINE_LOOP);
-				for(int k=0;k<4;k++)glVertex2i(i<<4|(k+1&2?1:15),j<<4|(k&2?1:15));
-				glEnd();
+				for(int k=0;k<8;k++)xyv[k]=(k&1?j:i)<<4|(k+1&4?1:15);
+				glDrawArrays(GL_LINE_LOOP,0,4);
 			}
 	glEndList();
 }
@@ -114,6 +112,32 @@ int mkwep(int w,int id,int c){
 	}
 	return 1;
 }
+int aimv(int da,int sw,uint8_t x,uint8_t y,int t){
+	for(int i=0;i<As;i++)
+		if(A[i][5]+t<256){
+			uint8_t
+				xx=A[i][1]+(A[i][3]-A[i][1])*(A[i][0]&32?(A[i][5]+t)<<1:(A[i][5]+t)*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2])),
+				yy=A[i][2]+(A[i][4]-A[i][2])*(A[i][0]&32?(A[i][5]+t)<<1:(A[i][5]+t)*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2]));
+			if(A[i][0]&128)xx=(A[i][6]<<1)-xx;
+			if(A[i][0]&64)yy=(A[i][7]<<1)-yy;
+			if(SQR(xx-x)+SQR(yy-y)<64)return 0;
+		}
+	for(int i=0;i<Bs;i++)
+		if(B[i][3]+t<=B[i][4]){
+			if(B[i][0]&128){
+				if(SQR(B[i][1]-x)+SQR(B[i][2]-y)>=SQR(B[i][3]+t))return 0;
+			}else(SQR(B[i][1]-x)+SQR(B[i][2]-y)<=SQR(B[i][3]+t))return 0;
+		}
+	if(da&&W((x+da&255)>>4,y)){
+		if(!sw)sw=da;
+		da=0;
+	}
+	if(sw&&W(x,(y+sw&255)>>4)){
+		if(!da)da=sw;
+		sw=0;
+	}
+	return t++==72?:1+(da||sw?aimv(da,sw,x+da,y+sw,t):0)+aimv(0,0,x,y,t);
+}
 int main(int argc,char**argv){
 	if(argc<2){
 		fprintf(stderr,"ip port\n");
@@ -143,7 +167,6 @@ int main(int argc,char**argv){
 	XSetWMProtocols(dpy,Wdo,(Atom[]){XInternAtom(dpy,"WM_DELETE_WINDOW",False)},1);
 	XMapWindow(dpy,Wdo);
 	glXMakeCurrent(dpy,Wdo,glXCreateContext(dpy,vi,0,GL_TRUE));
-	gettimeofday(&tvx,0);
 	#endif
 	FILE*pr=fopen("pr","rb");
 	if(pr){
@@ -168,13 +191,18 @@ int main(int argc,char**argv){
 	mkhud();
 	double fcx=xy[id][2]=-xy[id][0],fcy=xy[id][3]=-xy[id][1];
 	for(;;){
+		#ifdef GLX
+		gettimeofday(&tvx,0);
+		#else
+		tvx=SDL_GetTicks();
+		#endif
 		bfp=buff;
 		while(any(S)){
 			int r=readch(),r5=r>>5;
 			if(r==-1)return 0;
 			switch(r&31){
 			case(0)
-				cbts^=1<<(r5);
+				cbts^=1<<r5;
 				if(!(cbts&1<<r5)){
 					team[r5]=0;
 					win[r5]=0;
@@ -215,14 +243,12 @@ int main(int argc,char**argv){
 			case(19)
 				r=readch();
 				tar[r&15]=r>>4;
-			case(20)
-				memset(tar,0,8);
+			case(20)memset(tar,0,8);
 			case(21)
 				if(r5)win[r5-1]++;
 				else{
 					r=readch();
-					for(int i=0;i<8;i++)
-						if(r&1<<i)win[i]++;
+					for(int i=0;i<8;i++)win[i]+=!!(r&1<<i);
 				}
 			case(22)vir=r5;
 			}
@@ -346,10 +372,10 @@ int main(int argc,char**argv){
 					mni=i;
 				}
 			}
-		if(!chg[2]&&SQR(xy[mni][0]-xy[id][0])+SQR(xy[mni][1]-xy[id][1])<3000)w=wi[2];
+		if(!chg[2]&&kda&&ksw&&SQR(xy[mni][0]-xy[id][0])+SQR(xy[mni][1]-xy[id][1])<3000)w=wi[2];
 		else(!chg[3]&&mnv<4096)w=wi[3];
 		else(!chg[5])w=wi[5];
-		else(!chg[4])w=wi[4];
+		else(!chg[4]&&!W((xy[id][0]>>4)+(xy[id][2]>xy[id][0]?1:-1)&15,xy[id][1]>>4)&&!W(xy[id][0]>>4,(xy[id][1]>>4)+(xy[id][3]>xy[id][1]?1:-1)&15))w=wi[4];
 		else(!chg[1])w=wi[1];
 		else(!chg[7]){
 			w=wi[7];
@@ -357,38 +383,25 @@ int main(int argc,char**argv){
 				int mnv=1024;
 				cbts(i)
 					if(i!=id){
-						int ln=SQR(xy[i][0]-mixy[0])+SQR(xy[i][1]-mixy[1]);
+						int ln=SQR(xy[i][0]-B[39][0])+SQR(xy[i][1]-B[39][1]);
 						if(ln<mnv)mnv=ln;
-						ln=SQR(xy[i][0]-mixy[2])+SQR(xy[i][1]-mixy[3]);
+						ln=SQR(xy[i][0]-B[39][2])+SQR(xy[i][1]-B[39][3]);
 						if(ln<mnv)mnv=ln;
 					}
 				if(mnv==1024)mb=0;
 			}
-		}else(!chg[6])w=wi[6];
-		double mv[4]={};
-		#define REALDIS(x) (abs(x)<255-abs(x)?abs(x):255-abs(x))
-		#define REALCMP(x,y) (abs(x-y)<255-abs(x-y)?x>y:x<y)
-		for(int i=0;i<As;i++){
-			for(int j=A[i][5];j<A[i][5]+5;j++){
-				uint8_t
-					xx=A[i][1]+(A[i][3]-A[i][1])*(A[i][0]&32?j<<1:j*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2])),
-					yy=A[i][2]+(A[i][4]-A[i][2])*(A[i][0]&32?j<<1:j*3>>1)/sqrt(SQR(A[i][3]-A[i][1])+SQR(A[i][4]-A[i][2]));
-				double d=.2/(SQR(REALDIS(xx-xy[id][0]))+SQR(REALDIS(yy-xy[id][1])));
-				mv[REALCMP(xx,xy[id][0])]+=d;
-				mv[2+REALCMP(yy,xy[id][1])]+=d;
-			}
 		}
-		for(int i=0;i<Bs;i++)
-			if(!(B[i][0]&128)){
-				int di=SQR(REALDIS(B[i][1]-xy[id][0]))+SQR(REALDIS(B[i][2]-xy[id][1]));
-				if(di<SQR(B[i][4]+3)){
-					double d=B[i][3]/sqrt(di);
-					mv[REALCMP(B[i][1],xy[id][0])]+=d;
-					mv[2+REALCMP(B[i][2],xy[id][1])]+=d;
+		int mv[4],mx=0;
+		for(int i=-1;i<2;i++)
+			for(int j=-1;j<2;j++){
+				int mv=aimv(i,j,xy[id][0]+i,xy[id][1]+j,1);
+				if(mv>mx){
+					mx=mv;
+					kda=i;
+					ksw=j;
 				}
 			}
-		kda=mv[0]==mv[1]?0:mv[0]>mv[1]?1:-1;
-		ksw=mv[2]==mv[3]?0:mv[2]>mv[3]?1:-1;
+		if(mx<3&&!chg[6])w=wi[6];
 		mx=xy[mni][0];
 		my=xy[mni][1];
 		#endif
@@ -471,15 +484,15 @@ int main(int argc,char**argv){
 			if((*bfp=ws[w])<7)bfp+=mkwep(ws[w],id,1);
 			else(mine=!mine){
 				chg[7]=15;
-				memcpy(mixy,xy[id],4);
+				memcpy(B[39],xy[id],4);
 			}else{
 				chg[7]=180;
 				B[Bs][0]=B[Bs+1][0]=id;
 				*bfp++=7;
-				memcpy(bfp,mixy,4);
+				memcpy(bfp,B[39],4);
 				bfp+=4;
-				memcpy(B[Bs]+1,mixy,2);
-				memcpy(B[Bs+1]+1,mixy+2,2);
+				memcpy(B[Bs]+1,B[39],2);
+				memcpy(B[Bs+1]+1,B[39]+2,2);
 				*(uint16_t*)(B[Bs]+3)=*(uint16_t*)(B[Bs+1]+3)=0x2000;
 				Bs+=2;
 			}
@@ -488,11 +501,9 @@ int main(int argc,char**argv){
 		#ifdef GLX
 		gettimeofday(&tvy,0);
 		if(tvy.tv_usec>tvx.tv_usec&&tvy.tv_usec-tvx.tv_usec<30000)usleep(33000-(tvy.tv_usec-tvx.tv_usec));
-		gettimeofday(&tvx,0);
 		#else
 		tvy=SDL_GetTicks();
 		if(tvy>tvx&&tvy-tvx<30)SDL_Delay(33-(tvy-tvx));
-		tvx=SDL_GetTicks();
 		#endif
 	}
 }

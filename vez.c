@@ -214,7 +214,7 @@ int main(int argc,char**argv){
 				case(9)writech(team[i]=r>>5);
 				case(10)
 					flag9(i);
-					r=readch()&7;
+					r>>=5;
 					if(!(mode&24))hit(r,i);
 					if(mode&16&&team[r]&&team[i])hit(team[r]-1,team[i]-1);
 				case(11)
