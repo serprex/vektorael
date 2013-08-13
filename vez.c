@@ -123,7 +123,7 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,0,argc>1?atoi(argv[1]):2000)==-1||!(lis=SDLNet_TCP_Open(&ip))||SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(9),lis)==-1){
-		fputs(SDLNet_GetError(),stderr);
+		fputs(SDL_GetError(),stderr);
 		return 1;
 	}
 	#else
@@ -144,7 +144,7 @@ int main(int argc,char**argv){
 			uint8_t nid=0;
 			while(cbts&1<<nid)nid++;
 			#ifdef SDL
-			if(!(S=con[nid]=SDLNet_TCP_Accept(lis))||SDLNet_TCP_AddSocket(set,S)==-1)fputs(SDLNet_GetError(),stderr);
+			if(!(S=con[nid]=SDLNet_TCP_Accept(lis))||SDLNet_TCP_AddSocket(set,S)==-1)fputs(SDL_GetError(),stderr);
 			#else
 			if((S=con[nid]=accept(lis,0,0))<0)fprintf(stderr,"%d\n",errno);
 			#endif

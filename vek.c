@@ -5,12 +5,26 @@
 struct timeval tvx,tvy;
 #define KEYSYM XKeycodeToKeysym(dpy,ev.xkey.keycode,0)
 #define EV(y) ev.x##y
+#define SDL_SCANCODE_SPACE ' '
+#define SDL_SCANCODE_A 'a'
+#define SDL_SCANCODE_B 'b'
+#define SDL_SCANCODE_D 'd'
+#define SDL_SCANCODE_E 'e'
+#define SDL_SCANCODE_M 'm'
+#define SDL_SCANCODE_N 'n'
+#define SDL_SCANCODE_P 'p'
+#define SDL_SCANCODE_Q 'q'
+#define SDL_SCANCODE_S 's'
+#define SDL_SCANCODE_W 'w'
+#define SDL_SCANCODE_0 '0'
+#define SDL_SCANCODE_4 '4'
+#define SDL_SCANCODE_5 '5'
 #else
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <time.h>
 Uint32 tvx,tvy;
-#define KEYSYM ev.key.keysym.sym
+#define KEYSYM (ev.key.keysym.scancode)
 #define KeyPress SDL_KEYDOWN
 #define KeyRelease SDL_KEYUP
 #define ButtonPress SDL_MOUSEBUTTONDOWN
@@ -149,12 +163,13 @@ int main(int argc,char**argv){
 		return 1;
 	}
 	if(SDLNet_Init()==-1||SDLNet_ResolveHost(&ip,argv[1],argc>2?atoi(argv[2]):2000)==-1||!(S=SDLNet_TCP_Open(&ip))){
-		fputs(SDLNet_GetError(),stderr);
+		fputs(SDL_GetError(),stderr);
 		return 1;
 	}
 	SDLNet_TCP_AddSocket(set=SDLNet_AllocSocketSet(1),S);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER,1);
-	SDL_Surface*dpy=SDL_SetVideoMode(256,272,0,SDL_OPENGL);
+	SDL_Window*dpy=SDL_CreateWindow(0,SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,256,272,SDL_WINDOW_OPENGL);
+	SDL_GL_CreateContext(dpy);
 	#else
 	struct sockaddr_in ip={.sin_family=AF_INET,.sin_port=htons(argc>2?atoi(argv[2]):2000)};
 	if((S=socket(AF_INET,SOCK_STREAM,0))<0||inet_aton(argv[1],&ip.sin_addr)<=0||connect(S,(struct sockaddr*)&ip,sizeof(ip))<0){
@@ -412,10 +427,10 @@ int main(int argc,char**argv){
 			KeySym ks;
 			XNextEvent(dpy,&ev);
 		#else
-		SDL_GL_SwapBuffers();
+		SDL_GL_SwapWindow(dpy);
 		SDL_Event ev;
 		while(SDL_PollEvent(&ev)){
-			SDLKey ks;
+			SDL_Scancode ks;
 		#endif
 			switch(ev.type){
 			#ifndef AI
@@ -424,22 +439,26 @@ int main(int argc,char**argv){
 				if(EV(motion.y)<256)my=EV(motion.y);
 			case(KeyPress)case KeyRelease:{
 				ks=KEYSYM;
-				kda+=((ks=='d')-(ks=='a'))*(ev.type==KeyPress?:-1);
-				ksw+=((ks=='s')-(ks=='w'))*(ev.type==KeyPress?:-1);
+				kda+=((ks==SDL_SCANCODE_D)-(ks==SDL_SCANCODE_A))*(ev.type==KeyPress?:-1);
+				ksw+=((ks==SDL_SCANCODE_S)-(ks==SDL_SCANCODE_W))*(ev.type==KeyPress?:-1);
+				if(kda>1)kda=1;
+				else(kda<-1)kda=-1;
+				if(ksw>1)ksw=1;
+				else(ksw<-1)ksw=-1;
 				int keq;
-				if(ks=='b')mb=ev.type==KeyPress;
+				if(ks==SDL_SCANCODE_B)mb=ev.type==KeyPress;
 				else(ev.type==KeyRelease)break;
-				else(ks=='p')sbo^=1;
-				else(keq=(ks=='m')-(ks=='n'))w=w+keq&7;
-				else(keq=(ks=='e')-(ks=='q')){
+				else(ks==SDL_SCANCODE_P)sbo^=1;
+				else(keq=(ks==SDL_SCANCODE_E)-(ks==SDL_SCANCODE_Q))w=w+keq&7;
+				else(keq=(ks==SDL_SCANCODE_M)-(ks==SDL_SCANCODE_N)){
 					uint8_t t=ws[w];
 					ws[w]=ws[w+keq&7];
 					ws[w+keq&7]=t;
 					w=w+keq&7;
 					mkhud();
-				}else(ks>='0'&&ks<='4')team[id]=ks-'0';
-				else(ks=='5')k5=1;
-				else(ks==' '){
+				}else(ks>=SDL_SCANCODE_0&&ks<=SDL_SCANCODE_4)team[id]=ks-SDL_SCANCODE_0;
+				else(ks==SDL_SCANCODE_5)k5=1;
+				else(ks==SDL_SCANCODE_SPACE){
 					FILE*lv=fopen("pr","wb");
 					if(lv){
 						fwrite(W,16,2,lv);

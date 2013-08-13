@@ -1,5 +1,5 @@
 rule cc
- command=gcc -std=gnu11 -Os -march=native -s -ffast-math -fwhole-program -D{$"GLX -lX11" if len(sys.argv)==1 else "SDL `sdl-config --cflags` `sdl-config --libs` -lSDL_net"$} $in -o $out $lf
+ command=gcc -std=gnu11 -Os -march=native -s -ffast-math -fwhole-program -D{$"GLX -lX11" if len(sys.argv)==1 else "SDL `sdl2-config --cflags` `sdl2-config --libs` -lSDL_net"$} $in -o $out $lf
 build vektorael:cc vek.c|v.h
  lf=-lGL
 build vekairael:cc vek.c|v.h
